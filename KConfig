@@ -1,0 +1,8 @@
+# Kconfig for hello_lib
+
+# The main switch to enable the library
+config HELLO_LIB
+    bool "Enable the Hello Library"
+    default y
+    help
+      This option enables the custom 'hello_lib' library.
