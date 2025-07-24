@@ -2,7 +2,7 @@
 
 # The main switch to enable the library
 config HELLO_LIB
-    bool "Enable the Hello Library"
+    bool "Enable Hello Library"
     default y
     help
-      This option enables the custom 'hello_lib' library.
+      Enable the Hello Library functionality.
