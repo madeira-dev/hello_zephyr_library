@@ -1,4 +1,5 @@
 # zephyr/module.yml
 build:
   cmake: .
+settings:
   kconfig: Kconfig
