@@ -1,7 +1,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-// Include our math headers
+// Include math headers
 #include "core/math/biginteger.h"
 #include "core/math/polynomial.h"
 #include "core/math/math_hal.h"
