@@ -3,9 +3,6 @@ if(CONFIG_HELLO_LIB)
     # Create a Zephyr library
     zephyr_library()
 
-    # Add main hello_lib source file
-    zephyr_library_sources(src/hello_lib.c)
-
     # Add all the math library sources that hello_lib depends on
     zephyr_library_sources(
         src/core/math/biginteger.c
