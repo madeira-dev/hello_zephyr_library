@@ -2,10 +2,10 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/random/random.h>
 
-#ifdef CONFIG_SOC_NRF52840
-#include <hal/nrf_rng.h>
-#include <nrfx_rng.h>
-#endif
+// #ifdef CONFIG_SOC_NRF52840
+// #include <hal/nrf_rng.h>
+// #include <nrfx_rng.h>
+// #endif
 
 LOG_MODULE_REGISTER(math_hal, LOG_LEVEL_DBG);
 
@@ -24,10 +24,10 @@ math_word_t math_hal_mod_add(math_word_t a, math_word_t b, math_word_t m)
     if (b >= m)
         b = b % m;
 
-#ifdef CONFIG_SOC_NRF52840
-    uint64_t sum = (uint64_t)a + b;
-    return (math_word_t)(sum % m);
-#else
+    // #ifdef CONFIG_SOC_NRF52840
+    //     uint64_t sum = (uint64_t)a + b;
+    //     return (math_word_t)(sum % m);
+    // #else
     // For larger word sizes, more complex overflow handling needed
     math_word_t sum = a + b;
     if (sum < a)
@@ -36,7 +36,7 @@ math_word_t math_hal_mod_add(math_word_t a, math_word_t b, math_word_t m)
         return (sum % m);
     }
     return sum >= m ? sum - m : sum;
-#endif
+    // #endif
 }
 
 math_word_t math_hal_mod_sub(math_word_t a, math_word_t b, math_word_t m)
@@ -67,15 +67,15 @@ math_word_t math_hal_mod_mult(math_word_t a, math_word_t b, math_word_t m)
     a = a % m;
     b = b % m;
 
-#ifdef CONFIG_SOC_NRF52840
-    // Use 64-bit arithmetic for 32-bit words
-    uint64_t prod = (uint64_t)a * b;
-    return (math_word_t)(prod % m);
-#else
+    // #ifdef CONFIG_SOC_NRF52840
+    //     // Use 64-bit arithmetic for 32-bit words
+    //     uint64_t prod = (uint64_t)a * b;
+    //     return (math_word_t)(prod % m);
+    // #else
     // For 64-bit words, we'd need 128-bit arithmetic
     // Simplified implementation using library functions
     return (a * b) % m;
-#endif
+    // #endif
 }
 
 math_word_t math_hal_mod_pow(math_word_t base, math_word_t exp, math_word_t m)
@@ -209,21 +209,9 @@ static bool rng_initialized = false;
 
 int math_hal_rng_init(void)
 {
-#ifdef CONFIG_SOC_NRF52840
-    // Initialize nRF52840 hardware RNG
-    nrfx_err_t err = nrfx_rng_init(NULL, NULL);
-    if (err != NRFX_SUCCESS)
-    {
-        LOG_ERR("Failed to initialize hardware RNG: %d", err);
-        return -1;
-    }
-    LOG_INF("Initialized nRF52840 hardware RNG");
-#else
-    // Use Zephyr's random number generator
     LOG_INF("Using Zephyr software RNG");
-#endif
-
     rng_initialized = true;
+
     return 0;
 }
 
@@ -238,40 +226,34 @@ int math_hal_rng_bytes(uint8_t *buffer, size_t size)
             return -1;
     }
 
-#ifdef CONFIG_SOC_NRF52840
-    // Use hardware RNG if available
-    return math_hal_hw_rng_bytes(buffer, size);
-#else
-    // Fall back to Zephyr's RNG
     sys_rand_get(buffer, size);
     return 0;
-#endif
 }
 
-#ifdef CONFIG_SOC_NRF52840
-int math_hal_hw_rng_bytes(uint8_t *buffer, size_t size)
-{
-    if (!buffer || size == 0)
-        return -1;
+// #ifdef CONFIG_SOC_NRF52840
+// int math_hal_hw_rng_bytes(uint8_t *buffer, size_t size)
+// {
+//     if (!buffer || size == 0)
+//         return -1;
 
-    for (size_t i = 0; i < size; i++)
-    {
-        // Wait for random value to be ready
-        while (!nrf_rng_event_check(NRF_RNG, NRF_RNG_EVENT_VALRDY))
-        {
-            k_yield(); // Allow other threads to run
-        }
+//     for (size_t i = 0; i < size; i++)
+//     {
+//         // Wait for random value to be ready
+//         while (!nrf_rng_event_check(NRF_RNG, NRF_RNG_EVENT_VALRDY))
+//         {
+//             k_yield(); // Allow other threads to run
+//         }
 
-        // Read random byte
-        buffer[i] = nrf_rng_random_value_get(NRF_RNG);
+//         // Read random byte
+//         buffer[i] = nrf_rng_random_value_get(NRF_RNG);
 
-        // Clear event
-        nrf_rng_event_clear(NRF_RNG, NRF_RNG_EVENT_VALRDY);
-    }
+//         // Clear event
+//         nrf_rng_event_clear(NRF_RNG, NRF_RNG_EVENT_VALRDY);
+//     }
 
-    return 0;
-}
-#endif
+//     return 0;
+// }
+// #endif
 
 math_word_t math_hal_rng_uniform(math_word_t max)
 {
@@ -356,10 +338,10 @@ math_word_t math_hal_gcd(math_word_t a, math_word_t b)
 
 uint64_t math_hal_get_cycles(void)
 {
-#ifdef CONFIG_SOC_NRF52840
-    // Use ARM DWT cycle counter if available
-    return k_cycle_get_64();
-#else
+    // #ifdef CONFIG_SOC_NRF52840
+    //     // Use ARM DWT cycle counter if available
+    //     return k_cycle_get_64();
+    // #else
     return k_uptime_get();
-#endif
+    // #endif
 }
