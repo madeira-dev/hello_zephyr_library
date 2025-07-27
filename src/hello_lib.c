@@ -16,6 +16,10 @@ LOG_MODULE_REGISTER(hello_lib, LOG_LEVEL_DBG);
 
 void hello_lib_say_hello(void)
 {
-    // Using Zephyr's logging API is better than printk
-    LOG_INF("Hello World from my awesome Zephyr library!");
+    int num = 1;
+    int addition = 2;
+
+    LOG_INF("number is: %d", num);
+    LOG_INF("addition is: %d", addition);
+    LOG_INF("num+addition is: %d", (num + addition));
 }
