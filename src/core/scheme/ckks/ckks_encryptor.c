@@ -23,6 +23,7 @@ int ckks_encrypt(const ckks_cryptoparams_t *params,
                  const ckks_plaintext_t *plaintext,
                  ckks_ciphertext_t *ciphertext)
 {
+    volatile int entered = 1;
     LOG_INF("AAAAAAAAAAAAAAA I'M INSIDE CKKS_ENCRYPT()!!!!!!!!");
     if (!params || !pk || !plaintext || !ciphertext)
         return -1;
