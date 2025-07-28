@@ -207,9 +207,10 @@ int math_hal_ntt_mult(math_word_t *result, const math_word_t *a,
 
 static bool rng_initialized = false;
 
+// At the moment this function does nothing (due to some past problems) but I might change it in the future
 int math_hal_rng_init(void)
 {
-    LOG_INF("Using Zephyr software RNG");
+    LOG_INF("Using nRF52840 hardware RNG");
     rng_initialized = true;
 
     return 0;
