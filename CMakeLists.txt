@@ -9,6 +9,7 @@ if(CONFIG_HELLO_LIB)
         src/core/math/math_hal.c
         src/core/math/polynomial.c
         src/core/scheme/ckks/ckks_cryptoparams.c
+        src/core/scheme/ckks/ckks_encoder.c
         )
 
     # Make the include directory available to this library
