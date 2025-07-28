@@ -35,12 +35,7 @@ int ckks_encode(const ckks_encoder_t *encoder, const double *values, size_t valu
     for (size_t i = 0; i < value_count; i++)
     {
         double scaled = values[i] * encoder->scaling_factor;
-        int64_t rounded;
-
-        if (scaled >= 0)
-            rounded = (int64_t)(scaled + 0.5);
-        else
-            rounded = (int64_t)(scaled - 0.5);
+        int64_t rounded = (int64_t)llround(scaled);
 
         bigint_t coeff;
         bigint_init(&coeff);
