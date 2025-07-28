@@ -8,6 +8,7 @@ if(CONFIG_HELLO_LIB)
         src/core/math/biginteger.c
         src/core/math/math_hal.c
         src/core/math/polynomial.c
+        src/core/scheme/ckks/ckks_cryptoparams.c
         )
 
     # Make the include directory available to this library
@@ -19,6 +20,8 @@ if(CONFIG_HELLO_LIB)
         src/core
         src/core/math
         src/core/lattice
+        src/core/scheme
+        src/core/scheme/ckks
         )
 
     # Make the include directory available to targets that link against this library
