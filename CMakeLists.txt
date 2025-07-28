@@ -10,6 +10,8 @@ if(CONFIG_HELLO_LIB)
         src/core/math/polynomial.c
         src/core/scheme/ckks/ckks_cryptoparams.c
         src/core/scheme/ckks/ckks_encoder.c
+        src/core/scheme/ckks/ckks_keygen.c
+        src/core/scheme/ckks/ckks_encryptor.c
         )
 
     # Make the include directory available to this library
