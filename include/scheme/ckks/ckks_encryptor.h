@@ -8,7 +8,7 @@
  * @file ckks_encryptor.h
  * @brief CKKS encryption for OpenFHE-Embedded (encryption-only)
  *
- * Provides encryption of encoded CKKS plaintexts using a public key.
+ * Provides encryption of encoded plaintexts using a CKKS public key.
  */
 
 /**
