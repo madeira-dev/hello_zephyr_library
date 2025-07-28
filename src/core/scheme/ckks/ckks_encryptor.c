@@ -6,6 +6,9 @@
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(ckks_encrypt_err, LOG_LEVEL_INF);
+
+int ckks_encryptor_dummy_global = 42;
+
 /**
  * CKKS encryption:
  * Given plaintext m, public key (pk[0], pk[1]), and parameters:
@@ -20,6 +23,7 @@ int ckks_encrypt(const ckks_cryptoparams_t *params,
                  const ckks_plaintext_t *plaintext,
                  ckks_ciphertext_t *ciphertext)
 {
+    LOG_INF("AAAAAAAAAAAAAAA I'M INSIDE CKKS_ENCRYPT()!!!!!!!!");
     if (!params || !pk || !plaintext || !ciphertext)
         return -1;
 
