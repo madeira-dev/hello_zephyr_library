@@ -18,9 +18,6 @@ if(CONFIG_HELLO_LIB)
     # Make the include directory available to this library
     zephyr_library_include_directories(include)
 
-    # Export the include directory to consumers of this module
-    zephyr_interface_include_directories(include)
-
     # Include directories for headers
     zephyr_library_include_directories(
         src
