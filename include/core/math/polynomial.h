@@ -11,9 +11,9 @@
 // Configuration Macros
 // ============================================================================
 
-#define POLY_MAX_DEGREE 4096
+#define POLY_MAX_DEGREE 64
 #define POLY_MAX_COEFFS (POLY_MAX_DEGREE + 1)
-#define CKKS_MAX_MODULI 4
+#define CKKS_MAX_MODULI 2
 #define RNS_MAX_MODULI CKKS_MAX_MODULI
 
 // ============================================================================
