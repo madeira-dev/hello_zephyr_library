@@ -1,6 +1,5 @@
-#include <string.h>
 #include "scheme/ckks/ckks_cryptoparams.h"
-#include "core/math/prime_utils.h"
+#include <string.h>
 
 // Initialize CKKS crypto parameters
 int ckks_cryptoparams_init(
