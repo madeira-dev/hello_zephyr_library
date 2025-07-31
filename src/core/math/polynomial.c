@@ -547,16 +547,6 @@ int poly_mod_reduce(polynomial_t *poly, const poly_ring_params_t *params)
 // Utility Functions
 // ============================================================================
 
-int poly_mod_reduce(polynomial_t *poly, const poly_ring_params_t *params)
-{
-    if (!poly || !params)
-        return -1;
-
-    // Stub implementation - would reduce coefficients modulo the coefficient modulus
-    LOG_DBG("Performed modular reduction on polynomial (stub)");
-    return 0;
-}
-
 bool poly_equals(const polynomial_t *a, const polynomial_t *b)
 {
     if (!a || !b)
