@@ -15,7 +15,7 @@
  */
 
 // Maximum number of modulus primes in the chain (for RNS)
-#define CKKS_MAX_MODULI 4
+#define CKKS_MAX_MODULI 2
 
 typedef struct
 {
