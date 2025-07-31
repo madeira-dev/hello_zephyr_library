@@ -8,6 +8,7 @@ if(CONFIG_HELLO_LIB)
         src/core/math/biginteger.c
         src/core/math/math_hal.c
         src/core/math/polynomial.c
+        src/core/math/prime_utils.c
         src/core/scheme/ckks/ckks_cryptoparams.c
         src/core/scheme/ckks/ckks_encoder.c
         src/core/scheme/ckks/ckks_keygen.c
