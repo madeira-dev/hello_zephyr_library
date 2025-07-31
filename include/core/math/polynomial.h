@@ -5,6 +5,94 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "biginteger.h"
+#include "math_hal.h"
+#include "scheme/ckks/ckks_cryptoparams.h"
+
+// ============================================================================
+// RNS Polynomial Structures (for multi-modulus support)
+// ============================================================================
+
+/**
+ * @brief RNS polynomial: array of polynomials, one per modulus
+ *
+ * Each component polynomial is modulo a different prime in the modulus chain.
+ * Used for RNS representation in CKKS and other lattice schemes.
+ */
+#define RNS_MAX_MODULI CKKS_MAX_MODULI
+
+typedef struct
+{
+    polynomial_t polys[RNS_MAX_MODULI]; // One polynomial per modulus
+    uint32_t num_moduli;                // Number of moduli in use
+} rns_polynomial_t;
+
+/**
+ * @brief RNS NTT parameters: NTT tables for each modulus
+ */
+typedef struct
+{
+    ntt_params_t ntt_params[RNS_MAX_MODULI];
+    uint32_t num_moduli;
+} rns_ntt_params_t;
+
+// ============================================================================
+// RNS Polynomial Operations API
+// ============================================================================
+
+/**
+ * @brief Initialize an RNS polynomial (all component polys to zero)
+ * @param rpoly RNS polynomial to initialize
+ * @param degree Degree for each component polynomial
+ * @param num_moduli Number of moduli (RNS components)
+ * @return 0 on success, negative on error
+ */
+int rns_poly_init(rns_polynomial_t *rpoly, uint32_t degree, uint32_t num_moduli);
+
+/**
+ * @brief Copy one RNS polynomial to another
+ * @param dest Destination RNS polynomial
+ * @param src Source RNS polynomial
+ * @return 0 on success, negative on error
+ */
+int rns_poly_copy(rns_polynomial_t *dest, const rns_polynomial_t *src);
+
+/**
+ * @brief Convert all component polynomials to NTT form
+ * @param rpoly RNS polynomial to transform (in-place)
+ * @param ntt_params NTT parameters for each modulus
+ * @return 0 on success, negative on error
+ */
+int rns_poly_to_ntt(rns_polynomial_t *rpoly, const rns_ntt_params_t *ntt_params);
+
+/**
+ * @brief Convert all component polynomials from NTT form to coefficient form
+ * @param rpoly RNS polynomial to transform (in-place)
+ * @param ntt_params NTT parameters for each modulus
+ * @return 0 on success, negative on error
+ */
+int rns_poly_from_ntt(rns_polynomial_t *rpoly, const rns_ntt_params_t *ntt_params);
+
+/**
+ * @brief Add two RNS polynomials: result = a + b (component-wise)
+ * @param result Output RNS polynomial
+ * @param a First input
+ * @param b Second input
+ * @param params Ring parameters for each modulus
+ * @return 0 on success, negative on error
+ */
+int rns_poly_add(rns_polynomial_t *result, const rns_polynomial_t *a,
+                 const rns_polynomial_t *b, const poly_ring_params_t *params, uint32_t num_moduli);
+
+/**
+ * @brief Multiply two RNS polynomials: result = a * b (component-wise)
+ * @param result Output RNS polynomial
+ * @param a First input
+ * @param b Second input
+ * @param params Ring parameters for each modulus
+ * @return 0 on success, negative on error
+ */
+int rns_poly_mult(rns_polynomial_t *result, const rns_polynomial_t *a,
+                  const rns_polynomial_t *b, const poly_ring_params_t *params, uint32_t num_moduli);
 
 /**
  * @file polynomial.h

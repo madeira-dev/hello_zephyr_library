@@ -1,3 +1,4 @@
+#include "string.h"
 #include "core/math/polynomial.h"
 #include "core/math/math_hal.h"
 #include <zephyr/logging/log.h>
@@ -97,6 +98,95 @@ int poly_get_coeff(const polynomial_t *poly, uint32_t index, bigint_t *result)
     }
 
     bigint_copy(result, &poly->coeffs[index]);
+    return 0;
+}
+
+// ============================================================================
+// RNS Polynomial Operations
+// ============================================================================
+
+int rns_poly_init(rns_polynomial_t *rpoly, uint32_t degree, uint32_t num_moduli)
+{
+    if (!rpoly || num_moduli == 0 || num_moduli > RNS_MAX_MODULI)
+        return -1;
+
+    rpoly->num_moduli = num_moduli;
+    for (uint32_t i = 0; i < num_moduli; i++)
+    {
+        if (poly_init(&rpoly->polys[i], degree) != 0)
+            return -1;
+    }
+    return 0;
+}
+
+int rns_poly_copy(rns_polynomial_t *dest, const rns_polynomial_t *src)
+{
+    if (!dest || !src || src->num_moduli > RNS_MAX_MODULI)
+        return -1;
+
+    dest->num_moduli = src->num_moduli;
+    for (uint32_t i = 0; i < src->num_moduli; i++)
+    {
+        if (poly_copy(&dest->polys[i], &src->polys[i]) != 0)
+            return -1;
+    }
+    return 0;
+}
+
+int rns_poly_to_ntt(rns_polynomial_t *rpoly, const rns_ntt_params_t *ntt_params)
+{
+    if (!rpoly || !ntt_params || rpoly->num_moduli != ntt_params->num_moduli)
+        return -1;
+
+    for (uint32_t i = 0; i < rpoly->num_moduli; i++)
+    {
+        // Each modulus may have its own NTT params
+        if (poly_to_ntt(&rpoly->polys[i], (const poly_ring_params_t *)&ntt_params->ntt_params[i]) != 0)
+            return -1;
+    }
+    return 0;
+}
+
+int rns_poly_from_ntt(rns_polynomial_t *rpoly, const rns_ntt_params_t *ntt_params)
+{
+    if (!rpoly || !ntt_params || rpoly->num_moduli != ntt_params->num_moduli)
+        return -1;
+
+    for (uint32_t i = 0; i < rpoly->num_moduli; i++)
+    {
+        if (poly_from_ntt(&rpoly->polys[i], (const poly_ring_params_t *)&ntt_params->ntt_params[i]) != 0)
+            return -1;
+    }
+    return 0;
+}
+
+int rns_poly_add(rns_polynomial_t *result, const rns_polynomial_t *a,
+                 const rns_polynomial_t *b, const poly_ring_params_t *params, uint32_t num_moduli)
+{
+    if (!result || !a || !b || !params || num_moduli == 0 || num_moduli > RNS_MAX_MODULI)
+        return -1;
+
+    result->num_moduli = num_moduli;
+    for (uint32_t i = 0; i < num_moduli; i++)
+    {
+        if (poly_add(&result->polys[i], &a->polys[i], &b->polys[i], &params[i]) != 0)
+            return -1;
+    }
+    return 0;
+}
+
+int rns_poly_mult(rns_polynomial_t *result, const rns_polynomial_t *a,
+                  const rns_polynomial_t *b, const poly_ring_params_t *params, uint32_t num_moduli)
+{
+    if (!result || !a || !b || !params || num_moduli == 0 || num_moduli > RNS_MAX_MODULI)
+        return -1;
+
+    result->num_moduli = num_moduli;
+    for (uint32_t i = 0; i < num_moduli; i++)
+    {
+        if (poly_mult(&result->polys[i], &a->polys[i], &b->polys[i], &params[i]) != 0)
+            return -1;
+    }
     return 0;
 }
 
@@ -318,33 +408,91 @@ int poly_mult_scalar(polynomial_t *result, const polynomial_t *poly,
 }
 
 // ============================================================================
-// NTT Operations (Stubs)
+// NTT Operations
 // ============================================================================
 
+// Helper: Convert polynomial coefficients to/from math_word_t arrays
+static int poly_coeffs_to_words(const polynomial_t *poly, math_word_t *words, uint32_t n)
+{
+    if (!poly || !words || n == 0)
+        return -1;
+    for (uint32_t i = 0; i < n; i++)
+    {
+        // Only support small moduli that fit in math_word_t
+        if (i <= poly->degree)
+            words[i] = (math_word_t)(poly->coeffs[i].words[0]);
+        else
+            words[i] = 0;
+    }
+    return 0;
+}
+
+static int poly_words_to_coeffs(polynomial_t *poly, const math_word_t *words, uint32_t n)
+{
+    if (!poly || !words || n == 0)
+        return -1;
+    for (uint32_t i = 0; i < n; i++)
+    {
+        bigint_init_u64(&poly->coeffs[i], words[i]);
+    }
+    return 0;
+}
+
+// NTT: Convert polynomial to NTT form
 int poly_to_ntt(polynomial_t *poly, const poly_ring_params_t *params)
 {
     if (!poly || !params)
         return -1;
 
-    // Stub implementation - would convert to NTT form
-    poly->is_ntt_form = true;
+    ntt_params_t ntt_params;
+    math_word_t modulus = (math_word_t)(params->coefficient_modulus.words[0]);
+    uint32_t n = params->ring_dimension;
 
-    LOG_DBG("Converted polynomial to NTT form (stub)");
+    if (math_hal_ntt_init_params(&ntt_params, n, modulus) != 0)
+        return -1;
+
+    math_word_t data[POLY_MAX_COEFFS] = {0};
+    if (poly_coeffs_to_words(poly, data, n) != 0)
+        return -1;
+
+    if (math_hal_ntt_forward(data, &ntt_params) != 0)
+        return -1;
+
+    if (poly_words_to_coeffs(poly, data, n) != 0)
+        return -1;
+
+    poly->is_ntt_form = true;
     return 0;
 }
 
+// NTT: Convert polynomial from NTT form to coefficient form
 int poly_from_ntt(polynomial_t *poly, const poly_ring_params_t *params)
 {
     if (!poly || !params)
         return -1;
 
-    // Stub implementation - would convert from NTT form
-    poly->is_ntt_form = false;
+    ntt_params_t ntt_params;
+    math_word_t modulus = (math_word_t)(params->coefficient_modulus.words[0]);
+    uint32_t n = params->ring_dimension;
 
-    LOG_DBG("Converted polynomial from NTT form (stub)");
+    if (math_hal_ntt_init_params(&ntt_params, n, modulus) != 0)
+        return -1;
+
+    math_word_t data[POLY_MAX_COEFFS] = {0};
+    if (poly_coeffs_to_words(poly, data, n) != 0)
+        return -1;
+
+    if (math_hal_ntt_inverse(data, &ntt_params) != 0)
+        return -1;
+
+    if (poly_words_to_coeffs(poly, data, n) != 0)
+        return -1;
+
+    poly->is_ntt_form = false;
     return 0;
 }
 
+// NTT: Multiply two polynomials in NTT form (coefficient-wise)
 int poly_mult_ntt(polynomial_t *result, const polynomial_t *a,
                   const polynomial_t *b, const poly_ring_params_t *params)
 {
@@ -352,39 +500,46 @@ int poly_mult_ntt(polynomial_t *result, const polynomial_t *a,
         return -1;
 
     if (!a->is_ntt_form || !b->is_ntt_form)
-    {
-        LOG_ERR("Polynomials must be in NTT form for NTT multiplication");
         return -1;
-    }
 
-    // Stub implementation - would do coefficient-wise multiplication
-    if (poly_init(result, (a->degree > b->degree) ? a->degree : b->degree) != 0)
-    {
+    ntt_params_t ntt_params;
+    math_word_t modulus = (math_word_t)(params->coefficient_modulus.words[0]);
+    uint32_t n = params->ring_dimension;
+
+    if (math_hal_ntt_init_params(&ntt_params, n, modulus) != 0)
         return -1;
-    }
 
-    result->is_ntt_form = true;
+    math_word_t data_a[POLY_MAX_COEFFS] = {0};
+    math_word_t data_b[POLY_MAX_COEFFS] = {0};
+    math_word_t data_res[POLY_MAX_COEFFS] = {0};
+
+    if (poly_coeffs_to_words(a, data_a, n) != 0)
+        return -1;
+    if (poly_coeffs_to_words(b, data_b, n) != 0)
+        return -1;
+
+    if (math_hal_ntt_mult(data_res, data_a, data_b, &ntt_params) != 0)
+        return -1;
+
+    if (poly_words_to_coeffs(result, data_res, n) != 0)
+        return -1;
+
+    result->degree = n - 1;
     result->modulus_bits = params->modulus_bits;
+    result->is_ntt_form = true;
+    return 0;
+}
 
-    // Coefficient-wise multiplication in NTT domain
-    for (uint32_t i = 0; i <= result->degree; i++)
+// Modular reduction: Reduce all coefficients modulo the coefficient modulus
+int poly_mod_reduce(polynomial_t *poly, const poly_ring_params_t *params)
+{
+    if (!poly || !params)
+        return -1;
+
+    for (uint32_t i = 0; i <= poly->degree; i++)
     {
-        bigint_t coeff_a, coeff_b;
-        bigint_init(&coeff_a);
-        bigint_init(&coeff_b);
-
-        if (i <= a->degree)
-            bigint_copy(&coeff_a, &a->coeffs[i]);
-        if (i <= b->degree)
-            bigint_copy(&coeff_b, &b->coeffs[i]);
-
-        if (bigint_mult(&result->coeffs[i], &coeff_a, &coeff_b) != 0)
-        {
-            return -1;
-        }
+        bigint_mod(&poly->coeffs[i], &poly->coeffs[i], &params->coefficient_modulus);
     }
-
-    LOG_DBG("Performed NTT multiplication (stub)");
     return 0;
 }
 
