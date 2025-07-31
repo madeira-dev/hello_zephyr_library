@@ -1,4 +1,4 @@
-#include "prime_utils.h"
+#include "core/math/prime_utils.h"
 
 // fast trial primality
 static bool is_prime_simple(math_word_t x)
