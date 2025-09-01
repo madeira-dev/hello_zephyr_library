@@ -54,11 +54,11 @@ math_word_t math_hal_mod_mult(math_word_t a, math_word_t b, math_word_t m)
   if (m == 0)
     return 0;
 
-  // Reduce inputs
-  a = a % m;
-  b = b % m;
+  a %= m;
+  b %= m;
 
-  return (a * b) % m;
+  uint64_t prod = (uint64_t)a * (uint64_t)b;
+  return (math_word_t)(prod % (uint64_t)m);
 }
 
 math_word_t math_hal_mod_pow(math_word_t base, math_word_t exp, math_word_t m)
@@ -149,37 +149,74 @@ static void bit_reverse_permute(math_word_t *data, uint32_t n, uint32_t log_n)
   }
 }
 
+// Helper: collect distinct prime factors of n (n is small/power-of-two in NTT)
+static uint32_t unique_prime_factors(uint32_t n, uint32_t out[], uint32_t max_out)
+{
+  uint32_t cnt = 0;
+  if ((n & 1u) == 0u)
+  {
+    if (cnt < max_out)
+      out[cnt++] = 2;
+    while ((n & 1u) == 0u)
+      n >>= 1;
+  }
+  for (uint32_t f = 3; (uint64_t)f * (uint64_t)f <= n; f += 2)
+  {
+    if (n % f == 0)
+    {
+      if (cnt < max_out)
+        out[cnt++] = f;
+      while (n % f == 0)
+        n /= f;
+    }
+  }
+  if (n > 1 && cnt < max_out)
+    out[cnt++] = n;
+  return cnt;
+}
+
 // Helper function to find a primitive n-th root of unity modulo modulus
 // Assumes modulus is prime and n is a power of two that divides (modulus - 1)
 static math_word_t find_primitive_root(uint32_t n, math_word_t modulus)
 {
-  math_word_t order = modulus - 1;
-  if (n == 0 || (order % n) != 0)
+  if (n == 0)
     return 0;
 
-  // Candidate exponent to land in the unique subgroup of size n
-  math_word_t exponent = order / n;
+  math_word_t order = modulus - 1;
+  if ((order % n) != 0)
+    return 0; // no n-th roots exist in F_p
 
-  for (math_word_t g = 2; g < modulus; ++g)
+  // Precompute prime divisors of n for exact-order test
+  uint32_t facs[16];
+  uint32_t fac_cnt = unique_prime_factors(n, facs, 16);
+
+  // Project candidates into the subgroup of size dividing n, then enforce exact order n
+  math_word_t e = order / n;
+  for (math_word_t a = 2; a < modulus; ++a)
   {
-    math_word_t w = math_hal_mod_pow(g, exponent, modulus);
-
-    // w must not be 1
+    math_word_t w = math_hal_mod_pow(a, e, modulus);
     if (w == 1)
-    {
-      continue;
-    }
+      continue; // landed at identity; order < n
 
-    // A primitive n-th root w must satisfy w^n = 1 and w^(n/2) != 1.
-    // w^n = 1 is guaranteed by construction (Fermat's Little Theorem).
-    // We only need to check that the order is not a smaller power of 2.
-    if (math_hal_mod_pow(w, n / 2, modulus) != 1)
+    // Check exact order: w^n = 1 and w^(n/q) != 1 for every prime q | n
+    if (math_hal_mod_pow(w, n, modulus) != 1)
+      continue;
+
+    bool ok = true;
+    for (uint32_t i = 0; i < fac_cnt; ++i)
     {
-      return w; // Found a primitive n-th root of unity
+      uint32_t q = facs[i];
+      if (math_hal_mod_pow(w, n / q, modulus) == 1)
+      {
+        ok = false; // order is a proper divisor of n
+        break;
+      }
     }
+    if (ok)
+      return w; // primitive n-th root of unity found
   }
 
-  return 0; // No root found
+  return 0; // should not happen if n | (p-1)
 }
 
 int math_hal_ntt_init_params(ntt_params_t *params, uint32_t n, math_word_t modulus)
@@ -190,6 +227,8 @@ int math_hal_ntt_init_params(ntt_params_t *params, uint32_t n, math_word_t modul
   // Check if n divides (modulus - 1)
   if ((modulus - 1) % n != 0)
     return -1;
+
+  LOG_DBG("NTT init: n=%u, modulus=%u, (mod-1)/n=%u", n, (uint32_t)modulus, (uint32_t)((modulus - 1) / n));
 
   params->n = n;
   params->modulus = modulus;
@@ -203,18 +242,30 @@ int math_hal_ntt_init_params(ntt_params_t *params, uint32_t n, math_word_t modul
     params->log_n++;
   }
 
-  // Find primitive n-th root of unity
+  // Find primitive n-th root of unity with exact order n
   params->root_of_unity = find_primitive_root(n, modulus);
   if (params->root_of_unity == 0)
   {
-    LOG_ERR("Failed to find primitive root for NTT");
+    LOG_ERR("Failed to find primitive root for NTT (n=%u, mod=%u)", n, (uint32_t)modulus);
     return -1;
   }
 
   params->inv_root_of_unity = math_hal_mod_inv(params->root_of_unity, modulus);
-  params->inv_n = math_hal_mod_inv(n, modulus);
+  params->inv_n = math_hal_mod_inv(n % modulus, modulus);
 
-  LOG_DBG("Initialized NTT params: n=%u, modulus=%u, root=%u", n, (uint32_t)modulus, (uint32_t)params->root_of_unity);
+  // Sanity checks
+  if (math_hal_mod_mult(params->root_of_unity, params->inv_root_of_unity, modulus) != 1)
+  {
+    LOG_ERR("inv_root_of_unity invalid: root*inv_root != 1 (mod %u)", (uint32_t)modulus);
+    return -1;
+  }
+  if (math_hal_mod_mult(n % modulus, params->inv_n, modulus) != 1)
+  {
+    LOG_ERR("inv_n invalid: n*inv_n != 1 (mod %u)", (uint32_t)modulus);
+    return -1;
+  }
+
+  LOG_DBG("Initialized NTT params: n=%u, modulus=%u, root=%u, inv_root=%u, inv_n=%u", n, (uint32_t)modulus, (uint32_t)params->root_of_unity, (uint32_t)params->inv_root_of_unity, (uint32_t)params->inv_n);
   return 0;
 }
 
