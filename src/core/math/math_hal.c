@@ -127,8 +127,30 @@ math_word_t math_hal_mod_inv(math_word_t a, math_word_t m)
 // NTT Operations
 // ============================================================================
 
+// Helper: Bit-reversal permutation
+static void bit_reverse_permute(math_word_t *data, uint32_t n, uint32_t log_n)
+{
+  for (uint32_t i = 0; i < n; i++)
+  {
+    uint32_t j = 0;
+    uint32_t temp_i = i;
+    for (uint32_t k = 0; k < log_n; k++)
+    {
+      j = (j << 1) | (temp_i & 1);
+      temp_i >>= 1;
+    }
+
+    if (j > i)
+    {
+      math_word_t temp = data[i];
+      data[i] = data[j];
+      data[j] = temp;
+    }
+  }
+}
+
 // Helper function to find a primitive n-th root of unity modulo modulus
-// Assumes modulus is prime and n divides (modulus - 1)
+// Assumes modulus is prime and n is a power of two that divides (modulus - 1)
 static math_word_t find_primitive_root(uint32_t n, math_word_t modulus)
 {
   math_word_t order = modulus - 1;
@@ -140,27 +162,15 @@ static math_word_t find_primitive_root(uint32_t n, math_word_t modulus)
 
   for (math_word_t g = 2; g < modulus; ++g)
   {
-    // First jump into the subgroup of order dividing n
     math_word_t w = math_hal_mod_pow(g, exponent, modulus);
-    if (w == 1)
-      continue; // not a generator of the n-subgroup
 
-    // Verify that w has EXACT order n: for every prime factor q of n, w^(n/q) != 1
-    // Here n is a power of two in our use cases, so we can repeatedly divide by 2.
-    uint32_t t = n;
-    bool ok = true;
-    while ((t & 1u) == 0u) // while divisible by 2
+    // A primitive n-th root w must satisfy w^n = 1 and w^(n/2) != 1.
+    // w^n = 1 is guaranteed by construction (Fermat's Little Theorem).
+    // We only need to check that the order is not a smaller power of 2.
+    if (math_hal_mod_pow(w, n / 2, modulus) != 1)
     {
-      t >>= 1;
-      if (math_hal_mod_pow(w, t, modulus) == 1)
-      {
-        ok = false;
-        break;
-      }
+      return w; // Found a primitive n-th root of unity
     }
-
-    if (ok)
-      return w; // w is an n-th primitive root of unity
   }
 
   return 0; // No root found
@@ -207,10 +217,36 @@ int math_hal_ntt_forward(math_word_t *data, const ntt_params_t *params)
   if (!data || !params)
     return -1;
 
-  // Stub implementation of Cooley-Tukey NTT
-  // In practice, this would be a complex algorithm
+  uint32_t n = params->n;
+  uint32_t log_n = params->log_n;
+  math_word_t modulus = params->modulus;
 
-  LOG_DBG("Performed forward NTT (stub)");
+  // 1. Bit-reversal permutation
+  bit_reverse_permute(data, n, log_n);
+
+  // 2. Cooley-Tukey butterfly loops
+  for (uint32_t len = 2; len <= n; len <<= 1)
+  {
+    math_word_t w_len = math_hal_mod_pow(params->root_of_unity, n / len, modulus);
+    for (uint32_t i = 0; i < n; i += len)
+    {
+      math_word_t w = 1;
+      for (uint32_t j = 0; j < len / 2; j++)
+      {
+        uint32_t idx1 = i + j;
+        uint32_t idx2 = i + j + len / 2;
+        math_word_t u = data[idx1];
+        math_word_t v = math_hal_mod_mult(data[idx2], w, modulus);
+
+        data[idx1] = math_hal_mod_add(u, v, modulus);
+        data[idx2] = math_hal_mod_sub(u, v, modulus);
+
+        w = math_hal_mod_mult(w, w_len, modulus);
+      }
+    }
+  }
+
+  LOG_DBG("Performed forward NTT");
   return 0;
 }
 
@@ -219,8 +255,42 @@ int math_hal_ntt_inverse(math_word_t *data, const ntt_params_t *params)
   if (!data || !params)
     return -1;
 
-  // Stub implementation
-  LOG_DBG("Performed inverse NTT (stub)");
+  uint32_t n = params->n;
+  uint32_t log_n = params->log_n;
+  math_word_t modulus = params->modulus;
+
+  // 1. Bit-reversal permutation
+  bit_reverse_permute(data, n, log_n);
+
+  // 2. Cooley-Tukey butterfly loops (with inverse root)
+  for (uint32_t len = 2; len <= n; len <<= 1)
+  {
+    math_word_t w_len = math_hal_mod_pow(params->inv_root_of_unity, n / len, modulus);
+    for (uint32_t i = 0; i < n; i += len)
+    {
+      math_word_t w = 1;
+      for (uint32_t j = 0; j < len / 2; j++)
+      {
+        uint32_t idx1 = i + j;
+        uint32_t idx2 = i + j + len / 2;
+        math_word_t u = data[idx1];
+        math_word_t v = math_hal_mod_mult(data[idx2], w, modulus);
+
+        data[idx1] = math_hal_mod_add(u, v, modulus);
+        data[idx2] = math_hal_mod_sub(u, v, modulus);
+
+        w = math_hal_mod_mult(w, w_len, modulus);
+      }
+    }
+  }
+
+  // 3. Scale by n^-1
+  for (uint32_t i = 0; i < n; i++)
+  {
+    data[i] = math_hal_mod_mult(data[i], params->inv_n, modulus);
+  }
+
+  LOG_DBG("Performed inverse NTT");
   return 0;
 }
 
