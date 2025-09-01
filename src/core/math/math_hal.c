@@ -87,12 +87,12 @@ math_word_t math_hal_mod_pow(math_word_t base, math_word_t exp, math_word_t m)
 
 math_word_t math_hal_mod_inv(math_word_t a, math_word_t m)
 {
-  // Extended Euclidean Algorithm (simplified)
+  // Extended Euclidean Algorithm with signed handling for unsigned types
   if (m == 1)
     return 0;
 
   math_word_t m0 = m;
-  math_word_t x0 = 0, x1 = 1;
+  int32_t x0 = 0, x1 = 1; // Use signed for calculations
 
   if (a == 1)
     return 1;
@@ -104,16 +104,16 @@ math_word_t math_hal_mod_inv(math_word_t a, math_word_t m)
 
     m = a % m;
     a = t;
-    t = x0;
+    int32_t t_signed = x0;
 
-    x0 = x1 - q * x0;
-    x1 = t;
+    x0 = x1 - (int32_t)q * x0;
+    x1 = t_signed;
   }
 
   if (x1 < 0)
-    x1 += m0;
+    x1 += (int32_t)m0;
 
-  return x1;
+  return (math_word_t)x1 % m0; // Ensure positive and reduced
 }
 
 // ============================================================================
@@ -124,26 +124,36 @@ math_word_t math_hal_mod_inv(math_word_t a, math_word_t m)
 // Assumes modulus is prime and n divides (modulus - 1)
 static math_word_t find_primitive_root(uint32_t n, math_word_t modulus)
 {
-  // Find a generator g of the multiplicative group modulo modulus
-  math_word_t g = 2; // Start from 2
   math_word_t order = modulus - 1;
   math_word_t exponent = order / n;
 
+  // Find a generator g of the multiplicative group modulo modulus
+  math_word_t g = 2; // Start from 2
+
   while (g < modulus)
   {
-    // Check if g is a generator: g^((modulus-1)/d) != 1 for all divisors d of (modulus-1) except 1
-    // Simplified check: ensure g^exponent != 1
-    if (math_hal_mod_pow(g, exponent, modulus) != 1)
+    // Check if g is a primitive root: g^((modulus-1)/q) != 1 for prime q dividing (modulus-1)
+    // For modulus-1 = 2^k, check g^(2^i) != 1 for i=0 to k-1
+    bool is_primitive = true;
+    for (uint32_t i = 0; i < 4; i++) // Assuming modulus-1 <= 2^4 for small moduli; generalize if needed
     {
-      // Also check that g^order == 1 (trivial for generators)
-      if (math_hal_mod_pow(g, order, modulus) == 1)
+      math_word_t exp_check = order >> (i + 1); // (modulus-1) / 2^(i+1)
+      if (exp_check == 0)
+        break;
+      if (math_hal_mod_pow(g, exp_check, modulus) == 1)
       {
-        return math_hal_mod_pow(g, exponent, modulus);
+        is_primitive = false;
+        break;
       }
+    }
+
+    if (is_primitive && math_hal_mod_pow(g, order, modulus) == 1)
+    {
+      return math_hal_mod_pow(g, exponent, modulus); // Return the actual root
     }
     g++;
   }
-  return 0; // No root found (shouldn't happen if inputs are valid)
+  return 0; // No root found
 }
 
 int math_hal_ntt_init_params(ntt_params_t *params, uint32_t n, math_word_t modulus)
