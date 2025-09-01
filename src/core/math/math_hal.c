@@ -164,6 +164,12 @@ static math_word_t find_primitive_root(uint32_t n, math_word_t modulus)
   {
     math_word_t w = math_hal_mod_pow(g, exponent, modulus);
 
+    // w must not be 1
+    if (w == 1)
+    {
+      continue;
+    }
+
     // A primitive n-th root w must satisfy w^n = 1 and w^(n/2) != 1.
     // w^n = 1 is guaranteed by construction (Fermat's Little Theorem).
     // We only need to check that the order is not a smaller power of 2.
