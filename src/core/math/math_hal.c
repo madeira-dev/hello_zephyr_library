@@ -2,6 +2,7 @@
 #include "core/math/prime_utils.h"
 #include <zephyr/logging/log.h>
 #include <zephyr/random/random.h>
+#include <stdint.h>
 
 LOG_MODULE_REGISTER(math_hal, LOG_LEVEL_DBG);
 
@@ -14,21 +15,19 @@ math_word_t math_hal_mod_add(math_word_t a, math_word_t b, math_word_t m)
   if (m == 0)
     return 0;
 
-  // Prevent overflow in addition
-  if (a >= m)
-    a = a % m;
-  if (b >= m)
-    b = b % m;
+  a %= m;
+  b %= m;
 
-  // For larger word sizes, more complex overflow handling needed
-  math_word_t sum = a + b;
-  if (sum < a)
-  { // Overflow occurred
-    // Handle overflow case
-    return (sum % m);
+  // Compute (a + b) mod m without overflow
+  if (a >= m - b)
+  {
+    // a + b >= m  =>  (a + b) - m
+    return a - (m - b);
   }
-  return sum >= m ? sum - m : sum;
-  // #endif
+  else
+  {
+    return a + b;
+  }
 }
 
 math_word_t math_hal_mod_sub(math_word_t a, math_word_t b, math_word_t m)
@@ -87,33 +86,41 @@ math_word_t math_hal_mod_pow(math_word_t base, math_word_t exp, math_word_t m)
 
 math_word_t math_hal_mod_inv(math_word_t a, math_word_t m)
 {
-  // Extended Euclidean Algorithm with signed handling for unsigned types
-  if (m == 1)
+  // Extended Euclidean Algorithm with proper normalization
+  if (m == 0)
     return 0;
 
+  a %= m;
+  if (a == 0)
+    return 0; // no inverse exists
+
   math_word_t m0 = m;
-  int32_t x0 = 0, x1 = 1; // Use signed for calculations
 
-  if (a == 1)
-    return 1;
+  // Use wider signed accumulators to avoid overflow during updates
+  int64_t x0 = 0, x1 = 1;  // coefficients
+  int64_t aa = (int64_t)a; // current a
+  int64_t mm = (int64_t)m; // current m
 
-  while (a > 1)
+  while (aa > 1)
   {
-    math_word_t q = a / m;
-    math_word_t t = m;
+    int64_t q = aa / mm;
+    int64_t t = mm;
 
-    m = a % m;
-    a = t;
-    int32_t t_signed = x0;
+    mm = aa % mm;
+    aa = t;
 
-    x0 = x1 - (int32_t)q * x0;
+    int64_t t_signed = x0;
+    x0 = x1 - q * x0;
     x1 = t_signed;
   }
 
+  // x1 is the inverse in the range (-(m-1), m-1)
   if (x1 < 0)
-    x1 += (int32_t)m0;
+    x1 += (int64_t)m0;
 
-  return (math_word_t)x1 % m0; // Ensure positive and reduced
+  // Ensure we return a fully reduced, non-negative representative
+  x1 %= (int64_t)m0;
+  return (math_word_t)x1;
 }
 
 // ============================================================================
@@ -125,34 +132,37 @@ math_word_t math_hal_mod_inv(math_word_t a, math_word_t m)
 static math_word_t find_primitive_root(uint32_t n, math_word_t modulus)
 {
   math_word_t order = modulus - 1;
+  if (n == 0 || (order % n) != 0)
+    return 0;
+
+  // Candidate exponent to land in the unique subgroup of size n
   math_word_t exponent = order / n;
 
-  // Find a generator g of the multiplicative group modulo modulus
-  math_word_t g = 2; // Start from 2
-
-  while (g < modulus)
+  for (math_word_t g = 2; g < modulus; ++g)
   {
-    // Check if g is a primitive root: g^((modulus-1)/q) != 1 for prime q dividing (modulus-1)
-    // For modulus-1 = 2^k, check g^(2^i) != 1 for i=0 to k-1
-    bool is_primitive = true;
-    for (uint32_t i = 0; i < 4; i++) // Assuming modulus-1 <= 2^4 for small moduli; generalize if needed
+    // First jump into the subgroup of order dividing n
+    math_word_t w = math_hal_mod_pow(g, exponent, modulus);
+    if (w == 1)
+      continue; // not a generator of the n-subgroup
+
+    // Verify that w has EXACT order n: for every prime factor q of n, w^(n/q) != 1
+    // Here n is a power of two in our use cases, so we can repeatedly divide by 2.
+    uint32_t t = n;
+    bool ok = true;
+    while ((t & 1u) == 0u) // while divisible by 2
     {
-      math_word_t exp_check = order >> (i + 1); // (modulus-1) / 2^(i+1)
-      if (exp_check == 0)
-        break;
-      if (math_hal_mod_pow(g, exp_check, modulus) == 1)
+      t >>= 1;
+      if (math_hal_mod_pow(w, t, modulus) == 1)
       {
-        is_primitive = false;
+        ok = false;
         break;
       }
     }
 
-    if (is_primitive && math_hal_mod_pow(g, order, modulus) == 1)
-    {
-      return math_hal_mod_pow(g, exponent, modulus); // Return the actual root
-    }
-    g++;
+    if (ok)
+      return w; // w is an n-th primitive root of unity
   }
+
   return 0; // No root found
 }
 
