@@ -78,6 +78,7 @@ LOG_MODULE_REGISTER(math_hal, LOG_LEVEL_DBG);
 //   if (m == 0)
 //     return 0;
 //   a %= m;
+//   LOG_DBG("mod_inv: a=%u (reduced), m=%u", (uint32_t)a, (uint32_t)m);
 //   if (a == 0)
 //     return 0; // no inverse exists
 
@@ -102,6 +103,7 @@ LOG_MODULE_REGISTER(math_hal, LOG_LEVEL_DBG);
 //   int64_t inv = x1 % (int64_t)m0;
 //   if (inv < 0)
 //     inv += (int64_t)m0;
+//   LOG_DBG("mod_inv: inverse=%u", (uint32_t)inv);
 //   return (math_word_t)inv;
 // }
 
@@ -134,6 +136,7 @@ LOG_MODULE_REGISTER(math_hal, LOG_LEVEL_DBG);
 // Helper: collect distinct prime factors of n (n is small/power-of-two in NTT)
 static uint32_t unique_prime_factors(uint32_t n, uint32_t out[], uint32_t max_out)
 {
+  LOG_DBG("unique_prime_factors: input n=%u", (uint32_t)n);
   uint32_t cnt = 0;
   if ((n & 1u) == 0u)
   {
@@ -154,6 +157,10 @@ static uint32_t unique_prime_factors(uint32_t n, uint32_t out[], uint32_t max_ou
   }
   if (n > 1 && cnt < max_out)
     out[cnt++] = n;
+  for (uint32_t i = 0; i < cnt; ++i)
+  {
+    LOG_DBG("unique_prime_factors: out[%u]=%u", i, (uint32_t)out[i]);
+  }
   return cnt;
 }
 
@@ -161,45 +168,71 @@ static uint32_t unique_prime_factors(uint32_t n, uint32_t out[], uint32_t max_ou
 static math_word_t find_generator(math_word_t p)
 {
   math_word_t phi = p - 1;
+  LOG_DBG("find_generator: p=%u, phi=%u", (uint32_t)p, (uint32_t)phi);
   uint32_t pf[16];
   uint32_t pf_cnt = unique_prime_factors((uint32_t)phi, pf, 16);
   for (math_word_t a = 2; a < p; ++a)
   {
+    // Be careful to not flood logs for large p; keep it informative for small p
+    if (p <= 257)
+      LOG_DBG("find_generator: testing a=%u", (uint32_t)a);
     bool ok = true;
     for (uint32_t i = 0; i < pf_cnt; ++i)
     {
       if (math_hal_mod_pow(a, phi / pf[i], p) == 1)
       {
+        if (p <= 257)
+          LOG_DBG("find_generator: a=%u rejected by factor q=%u", (uint32_t)a, (uint32_t)pf[i]);
         ok = false;
         break;
       }
     }
     if (ok)
+    {
+      LOG_DBG("find_generator: generator found g=%u", (uint32_t)a);
       return a;
+    }
   }
+  LOG_ERR("find_generator: no generator found for p=%u", (uint32_t)p);
   return 0;
 }
 
 // Return an element of exact order n, assuming n | (p-1)
 static math_word_t find_primitive_nth_root(uint32_t n, math_word_t p)
 {
+  LOG_DBG("find_primitive_nth_root: n=%u, p=%u", (uint32_t)n, (uint32_t)p);
   if (n == 0)
     return 0;
   math_word_t phi = p - 1;
   if ((phi % n) != 0)
+  {
+    LOG_DBG("find_primitive_nth_root: phi=%u, phi/n=%u", (uint32_t)phi, (uint32_t)(phi / n));
     return 0;
+  }
+  LOG_DBG("find_primitive_nth_root: phi=%u, phi/n=%u", (uint32_t)phi, (uint32_t)(phi / n));
 
   math_word_t g = find_generator(p);
   if (!g)
     return 0;
 
   math_word_t w = math_hal_mod_pow(g, phi / n, p);
+  LOG_DBG("find_primitive_nth_root: g=%u, w=g^(phi/n)=%u", (uint32_t)g, (uint32_t)w);
 
   // Power-of-two exactness check: w^n == 1 and w^(n/2) != 1
-  if (math_hal_mod_pow(w, n, p) != 1)
+  math_word_t wn = math_hal_mod_pow(w, n, p);
+  math_word_t wn2 = (n & 1u) ? 0 : math_hal_mod_pow(w, n >> 1, p);
+  LOG_DBG("find_primitive_nth_root: w^n=%u, w^(n/2)=%u", (uint32_t)wn, (uint32_t)wn2);
+
+  if (wn != 1)
+  {
+    LOG_ERR("find_primitive_nth_root: failure w^n != 1 (=%u)", (uint32_t)wn);
     return 0;
-  if ((n & 1u) == 0u && math_hal_mod_pow(w, n >> 1, p) == 1)
+  }
+  if ((n & 1u) == 0u && wn2 == 1)
+  {
+    LOG_ERR("find_primitive_nth_root: failure w^(n/2) == 1 (order too small)");
     return 0;
+  }
 
   return w;
 }
@@ -210,6 +243,7 @@ static inline math_word_t mod_inv_prime_safe(math_word_t a, math_word_t p)
   math_word_t inv = math_hal_mod_inv(a % p, p);
   if (inv == 0 || inv >= p)
   {
+    LOG_DBG("mod_inv_prime_safe: fallback Fermat for a=%u mod p=%u", (uint32_t)(a % p), (uint32_t)p);
     inv = math_hal_mod_pow(a % p, p - 2, p);
   }
   return inv;
@@ -237,9 +271,11 @@ int math_hal_ntt_init_params(ntt_params_t *params, uint32_t n, math_word_t modul
     temp >>= 1;
     params->log_n++;
   }
+  LOG_DBG("NTT init mid: n=%u, modulus=%u, log_n=%u", n, (uint32_t)modulus, params->log_n);
 
   // Find primitive n-th root of unity with exact order n
   params->root_of_unity = find_primitive_nth_root(n, modulus);
+  LOG_DBG("NTT init: root_of_unity=%u", (uint32_t)params->root_of_unity);
   if (params->root_of_unity == 0)
   {
     LOG_ERR("Failed to find primitive root for NTT (n=%u, mod=%u)", n, (uint32_t)modulus);
@@ -247,8 +283,11 @@ int math_hal_ntt_init_params(ntt_params_t *params, uint32_t n, math_word_t modul
   }
 
   // Verify exact order for power-of-two n: w^n == 1 and w^(n/2) != 1
-  if (math_hal_mod_pow(params->root_of_unity, n, modulus) != 1 ||
-      (n > 1 && math_hal_mod_pow(params->root_of_unity, n >> 1, modulus) == 1))
+  math_word_t check_n = math_hal_mod_pow(params->root_of_unity, n, modulus);
+  math_word_t check_n2 = (n > 1) ? math_hal_mod_pow(params->root_of_unity, n >> 1, modulus) : 0;
+  LOG_DBG("NTT verify: w^n=%u, w^(n/2)=%u", (uint32_t)check_n, (uint32_t)check_n2);
+  if (check_n != 1 ||
+      (n > 1 && check_n2 == 1))
   {
     LOG_ERR("Primitive root does not have exact order n (n=%u, mod=%u)", n, (uint32_t)modulus);
     return -1;
@@ -256,6 +295,7 @@ int math_hal_ntt_init_params(ntt_params_t *params, uint32_t n, math_word_t modul
 
   params->inv_root_of_unity = mod_inv_prime_safe(params->root_of_unity, modulus);
   params->inv_n = mod_inv_prime_safe((math_word_t)(n % modulus), modulus);
+  LOG_DBG("NTT inverses: inv_root=%u, inv_n=%u", (uint32_t)params->inv_root_of_unity, (uint32_t)params->inv_n);
 
   // Sanity checks
   if (math_hal_mod_mult(params->root_of_unity, params->inv_root_of_unity, modulus) != 1)
