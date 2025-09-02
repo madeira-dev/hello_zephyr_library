@@ -14,15 +14,11 @@ LOG_MODULE_REGISTER(math_hal, LOG_LEVEL_DBG);
 // {
 //   if (m == 0)
 //     return 0;
-
 //   a %= m;
 //   b %= m;
-
-//   // Compute (a + b) mod m without overflow
 //   if (a >= m - b)
 //   {
-//     // a + b >= m  =>  (a + b) - m
-//     return a - (m - b);
+//     return a - (m - b); // (a + b) - m
 //   }
 //   else
 //   {
@@ -34,11 +30,8 @@ LOG_MODULE_REGISTER(math_hal, LOG_LEVEL_DBG);
 // {
 //   if (m == 0)
 //     return 0;
-
-//   // Ensure inputs are reduced
-//   a = a % m;
-//   b = b % m;
-
+//   a %= m;
+//   b %= m;
 //   if (a >= b)
 //   {
 //     return a - b;
@@ -53,10 +46,8 @@ LOG_MODULE_REGISTER(math_hal, LOG_LEVEL_DBG);
 // {
 //   if (m == 0)
 //     return 0;
-
 //   a %= m;
 //   b %= m;
-
 //   uint64_t prod = (uint64_t)a * (uint64_t)b;
 //   return (math_word_t)(prod % (uint64_t)m);
 // }
@@ -67,10 +58,8 @@ LOG_MODULE_REGISTER(math_hal, LOG_LEVEL_DBG);
 //     return 0;
 //   if (exp == 0)
 //     return 1;
-
 //   math_word_t result = 1;
-//   base = base % m;
-
+//   base %= m;
 //   while (exp > 0)
 //   {
 //     if (exp & 1)
@@ -80,7 +69,6 @@ LOG_MODULE_REGISTER(math_hal, LOG_LEVEL_DBG);
 //     exp >>= 1;
 //     base = math_hal_mod_mult(base, base, m);
 //   }
-
 //   return result;
 // }
 
@@ -89,13 +77,11 @@ LOG_MODULE_REGISTER(math_hal, LOG_LEVEL_DBG);
 //   // Extended Euclidean Algorithm with proper normalization
 //   if (m == 0)
 //     return 0;
-
 //   a %= m;
 //   if (a == 0)
 //     return 0; // no inverse exists
 
 //   math_word_t m0 = m;
-
 //   // Use wider signed accumulators to avoid overflow during updates
 //   int64_t x0 = 0, x1 = 1;  // coefficients
 //   int64_t aa = (int64_t)a; // current a
@@ -105,10 +91,8 @@ LOG_MODULE_REGISTER(math_hal, LOG_LEVEL_DBG);
 //   {
 //     int64_t q = aa / mm;
 //     int64_t t = mm;
-
 //     mm = aa % mm;
 //     aa = t;
-
 //     int64_t t_signed = x0;
 //     x0 = x1 - q * x0;
 //     x1 = t_signed;
@@ -148,73 +132,87 @@ LOG_MODULE_REGISTER(math_hal, LOG_LEVEL_DBG);
 // }
 
 // Helper: collect distinct prime factors of n (n is small/power-of-two in NTT)
-// static uint32_t unique_prime_factors(uint32_t n, uint32_t out[], uint32_t max_out)
-// {
-//   uint32_t cnt = 0;
-//   if ((n & 1u) == 0u)
-//   {
-//     if (cnt < max_out)
-//       out[cnt++] = 2;
-//     while ((n & 1u) == 0u)
-//       n >>= 1;
-//   }
-//   for (uint32_t f = 3; (uint64_t)f * (uint64_t)f <= n; f += 2)
-//   {
-//     if (n % f == 0)
-//     {
-//       if (cnt < max_out)
-//         out[cnt++] = f;
-//       while (n % f == 0)
-//         n /= f;
-//     }
-//   }
-//   if (n > 1 && cnt < max_out)
-//     out[cnt++] = n;
-//   return cnt;
-// }
-
-// Helper function to find a primitive n-th root of unity modulo modulus
-// Assumes modulus is prime and n is a power of two that divides (modulus - 1)
-static math_word_t find_primitive_root(uint32_t n, math_word_t modulus)
+static uint32_t unique_prime_factors(uint32_t n, uint32_t out[], uint32_t max_out)
 {
-  if (n == 0)
-    return 0;
-
-  math_word_t order = modulus - 1;
-  if ((order % n) != 0)
-    return 0; // no n-th roots exist in F_p
-
-  // Precompute prime divisors of n for exact-order test
-  uint32_t facs[16];
-  uint32_t fac_cnt = unique_prime_factors(n, facs, 16);
-
-  // Project candidates into the subgroup of size dividing n, then enforce exact order n
-  math_word_t e = order / n;
-  for (math_word_t a = 2; a < modulus; ++a)
+  uint32_t cnt = 0;
+  if ((n & 1u) == 0u)
   {
-    math_word_t w = math_hal_mod_pow(a, e, modulus);
-    if (w == 1)
-      continue; // landed at identity; order < n
-
-    // Check exact order: w^n = 1 and w^(n/q) != 1 for every prime q | n
-    if (math_hal_mod_pow(w, n, modulus) != 1)
-      continue;
-
-    bool ok = true;
-    for (uint32_t i = 0; i < fac_cnt; ++i)
+    if (cnt < max_out)
+      out[cnt++] = 2;
+    while ((n & 1u) == 0u)
+      n >>= 1;
+  }
+  for (uint32_t f = 3; (uint64_t)f * (uint64_t)f <= n; f += 2)
+  {
+    if (n % f == 0)
     {
-      uint32_t q = facs[i];
-      if (math_hal_mod_pow(w, n / q, modulus) == 1)
+      if (cnt < max_out)
+        out[cnt++] = f;
+      while (n % f == 0)
+        n /= f;
+    }
+  }
+  if (n > 1 && cnt < max_out)
+    out[cnt++] = n;
+  return cnt;
+}
+
+// Find a generator g of F_p^* (order p-1)
+static math_word_t find_generator(math_word_t p)
+{
+  math_word_t phi = p - 1;
+  uint32_t pf[16];
+  uint32_t pf_cnt = unique_prime_factors((uint32_t)phi, pf, 16);
+  for (math_word_t a = 2; a < p; ++a)
+  {
+    bool ok = true;
+    for (uint32_t i = 0; i < pf_cnt; ++i)
+    {
+      if (math_hal_mod_pow(a, phi / pf[i], p) == 1)
       {
-        ok = false; // order is a proper divisor of n
+        ok = false;
         break;
       }
     }
     if (ok)
-      return w; // primitive n-th root of unity found
+      return a;
   }
+  return 0;
+}
 
-  return 0; // should not happen if n | (p-1)
+// Return an element of exact order n, assuming n | (p-1)
+static math_word_t find_primitive_nth_root(uint32_t n, math_word_t p)
+{
+  if (n == 0)
+    return 0;
+  math_word_t phi = p - 1;
+  if ((phi % n) != 0)
+    return 0;
+
+  math_word_t g = find_generator(p);
+  if (!g)
+    return 0;
+
+  math_word_t w = math_hal_mod_pow(g, phi / n, p);
+
+  // Power-of-two exactness check: w^n == 1 and w^(n/2) != 1
+  if (math_hal_mod_pow(w, n, p) != 1)
+    return 0;
+  if ((n & 1u) == 0u && math_hal_mod_pow(w, n >> 1, p) == 1)
+    return 0;
+
+  return w;
+}
+
+// Safe modular inverse for prime modulus with Fermat fallback
+static inline math_word_t mod_inv_prime_safe(math_word_t a, math_word_t p)
+{
+  math_word_t inv = math_hal_mod_inv(a % p, p);
+  if (inv == 0 || inv >= p)
+  {
+    inv = math_hal_mod_pow(a % p, p - 2, p);
+  }
+  return inv;
 }
 
 int math_hal_ntt_init_params(ntt_params_t *params, uint32_t n, math_word_t modulus)
@@ -241,48 +239,23 @@ int math_hal_ntt_init_params(ntt_params_t *params, uint32_t n, math_word_t modul
   }
 
   // Find primitive n-th root of unity with exact order n
-  params->root_of_unity = find_primitive_root(n, modulus);
+  params->root_of_unity = find_primitive_nth_root(n, modulus);
   if (params->root_of_unity == 0)
   {
     LOG_ERR("Failed to find primitive root for NTT (n=%u, mod=%u)", n, (uint32_t)modulus);
     return -1;
   }
 
-  // Extra safety: ensure the returned element has exact order n.
-  // If a generator (order p-1) accidentally slips through, project and re-verify.
-  if (math_hal_mod_pow(params->root_of_unity, n, modulus) != 1)
+  // Verify exact order for power-of-two n: w^n == 1 and w^(n/2) != 1
+  if (math_hal_mod_pow(params->root_of_unity, n, modulus) != 1 ||
+      (n > 1 && math_hal_mod_pow(params->root_of_unity, n >> 1, modulus) == 1))
   {
-    // Project candidate into the subgroup whose size divides n
-    params->root_of_unity =
-        math_hal_mod_pow(params->root_of_unity, (modulus - 1) / n, modulus);
+    LOG_ERR("Primitive root does not have exact order n (n=%u, mod=%u)", n, (uint32_t)modulus);
+    return -1;
   }
 
-  // Verify exact order: w^n == 1 and w^(n/q) != 1 for all prime q | n.
-  uint32_t __facs[16];
-  uint32_t __fac_cnt = unique_prime_factors(n, __facs, 16);
-  bool __exact_ok = (math_hal_mod_pow(params->root_of_unity, n, modulus) == 1);
-  for (uint32_t __i = 0; __i < __fac_cnt && __exact_ok; ++__i)
-  {
-    uint32_t __q = __facs[__i];
-    if (math_hal_mod_pow(params->root_of_unity, n / __q, modulus) == 1)
-    {
-      __exact_ok = false;
-    }
-  }
-  if (!__exact_ok)
-  {
-    // Fall back to a clean search (should be rare).
-    params->root_of_unity = find_primitive_root(n, modulus);
-    if (params->root_of_unity == 0 ||
-        math_hal_mod_pow(params->root_of_unity, n, modulus) != 1)
-    {
-      LOG_ERR("Failed to obtain primitive n-th root with exact order (n=%u, mod=%u)", n, (uint32_t)modulus);
-      return -1;
-    }
-  }
-
-  params->inv_root_of_unity = math_hal_mod_inv(params->root_of_unity, modulus);
-  params->inv_n = math_hal_mod_inv(n % modulus, modulus);
+  params->inv_root_of_unity = mod_inv_prime_safe(params->root_of_unity, modulus);
+  params->inv_n = mod_inv_prime_safe((math_word_t)(n % modulus), modulus);
 
   // Sanity checks
   if (math_hal_mod_mult(params->root_of_unity, params->inv_root_of_unity, modulus) != 1)

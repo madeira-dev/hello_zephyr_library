@@ -23,27 +23,16 @@
  */
 
 // ============================================================================
-// Platform Configuration
+// Platform Configuration (nRF52840-only)
 // ============================================================================
 
-// Enable/disable hardware optimizations based on target platform
-#ifdef CONFIG_SOC_NRF52840
+// Platform Configuration (nRF52840-only)
 #define MATH_HAL_HAS_DSP_INSTRUCTIONS 1
 #define MATH_HAL_HAS_FPU 1
 #define MATH_HAL_HAS_HARDWARE_RNG 1
 #define MATH_HAL_HAS_AES_ACCELERATOR 1
 #define MATH_HAL_WORD_SIZE 32
 #define MATH_HAL_CPU_FREQUENCY_MHZ 64
-#elif defined(CONFIG_CPU_CORTEX_M4)
-#define MATH_HAL_HAS_DSP_INSTRUCTIONS 1
-#define MATH_HAL_WORD_SIZE 32
-#elif defined(CONFIG_CPU_CORTEX_M7)
-#define MATH_HAL_HAS_DSP_INSTRUCTIONS 1
-#define MATH_HAL_HAS_FPU 1
-#define MATH_HAL_WORD_SIZE 32
-#else
-#define MATH_HAL_WORD_SIZE 32
-#endif
 
 // Maximum modulus size supported (in bits)
 #define MATH_HAL_MAX_MODULUS_BITS 64
@@ -56,13 +45,8 @@
 /**
  * @brief Basic word type for mathematical operations
  */
-#ifdef CONFIG_SOC_NRF52840
 typedef uint32_t math_word_t; // Use 32-bit for nRF52840
 typedef uint16_t math_half_word_t;
-#else
-typedef uint64_t math_word_t;
-typedef uint32_t math_half_word_t;
-#endif
 
 // ============================================================================
 // Modular Arithmetic Primitives
@@ -129,12 +113,12 @@ math_word_t math_hal_mod_inv(math_word_t a, math_word_t m);
  */
 typedef struct
 {
-    math_word_t modulus;           // NTT modulus (must be prime)
-    math_word_t root_of_unity;     // Primitive n-th root of unity
-    math_word_t inv_root_of_unity; // Inverse of root of unity
-    math_word_t inv_n;             // Modular inverse of n
-    uint32_t n;                    // Transform size (power of 2)
-    uint32_t log_n;                // log2(n)
+  math_word_t modulus;           // NTT modulus (must be prime)
+  math_word_t root_of_unity;     // Primitive n-th root of unity
+  math_word_t inv_root_of_unity; // Inverse of root of unity
+  math_word_t inv_n;             // Modular inverse of n
+  uint32_t n;                    // Transform size (power of 2)
+  uint32_t log_n;                // log2(n)
 } ntt_params_t;
 
 /**
