@@ -6,6 +6,7 @@
 #include "core/math/polynomial.h"
 #include "core/math/biginteger.h"
 #include "scheme/ckks/ckks_cryptoparams.h"
+#include "ckks.h"
 
 /**
  * @file ckks_encoder.h
@@ -19,9 +20,9 @@
 
 typedef struct
 {
-    uint32_t slot_count;               // Number of slots (N/2)
-    double scaling_factor;             // Scaling factor (Δ)
-    const ckks_cryptoparams_t *params; // Pointer to CKKS crypto parameters
+  uint32_t slot_count;               // Number of slots (N/2)
+  double scaling_factor;             // Scaling factor (Δ)
+  const ckks_cryptoparams_t *params; // Pointer to CKKS crypto parameters
 } ckks_encoder_t;
 
 /**
@@ -42,6 +43,6 @@ int ckks_encoder_init(ckks_encoder_t *encoder, const ckks_cryptoparams_t *params
  *
  * Note: Only encoding is supported (no decoding).
  */
-int ckks_encode(const ckks_encoder_t *encoder, const double *values, size_t value_count, polynomial_t *poly);
+int ckks_encode(const ckks_encoder_t *encoder, const double *values, size_t value_count, ckks_plaintext_t *plaintext);
 
 #endif // OPENFHE_SCHEME_CKKS_ENCODER_H_

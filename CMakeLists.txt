@@ -5,10 +5,13 @@ if(CONFIG_HELLO_LIB)
 
     # Add all the math library sources that hello_lib depends on
     zephyr_library_sources(
+        src/openfhe_embedded.c
         src/core/math/biginteger.c
+        src/core/math/dgg.c
         src/core/math/math_hal.c
         src/core/math/polynomial.c
         src/core/math/prime_utils.c
+        src/core/utils/serialization.c
         src/core/scheme/ckks/ckks_cryptoparams.c
         src/core/scheme/ckks/ckks_encoder.c
         src/core/scheme/ckks/ckks_keygen.c

@@ -103,25 +103,41 @@ math_word_t math_hal_mod_pow(math_word_t base, math_word_t exp, math_word_t m);
  */
 math_word_t math_hal_mod_inv(math_word_t a, math_word_t m);
 
+/**
+ * @brief Find a primitive k-th root of unity modulo a prime modulus.
+ * @param k The order of the root to find.
+ * @param modulus The prime modulus.
+ * @return A primitive k-th root of unity, or 0 if none exists.
+ */
+math_word_t math_hal_find_primitive_root(math_word_t k, math_word_t modulus);
+
 // ============================================================================
 // Number Theoretic Transform (NTT) Operations
 // ============================================================================
 
-/**
- * @brief NTT parameters structure
- */
-typedef struct
-{
-  math_word_t modulus;           // NTT modulus (must be prime)
-  math_word_t root_of_unity;     // Primitive n-th root of unity
-  math_word_t inv_root_of_unity; // Inverse of root of unity
-  math_word_t inv_n;             // Modular inverse of n
-  uint32_t n;                    // Transform size (power of 2)
-  uint32_t log_n;                // log2(n)
-} ntt_params_t;
+// Forward declare the struct to use it in the function pointer typedefs
+typedef struct ntt_params_s ntt_params_t;
 
 /**
- * @brief Initialize NTT parameters for given transform size
+ * @brief Structure for NTT parameters and function pointers.
+ */
+struct ntt_params_s
+{
+  uint32_t n;                    // NTT size
+  uint32_t log_n;                // log2(n)
+  math_word_t modulus;           // Modulus for NTT
+  math_word_t root_of_unity;     // N-th root of unity
+  math_word_t inv_root_of_unity; // Inverse of the N-th root of unity
+  math_word_t inv_n;             // Modular inverse of N
+
+  // Function pointers for specific NTT implementations (C, DSP, etc.)
+  void (*ntt_forward_impl)(math_word_t *data, const ntt_params_t *params);
+  void (*ntt_inverse_impl)(math_word_t *data, const ntt_params_t *params);
+  void (*ntt_mult_impl)(math_word_t *result, const math_word_t *a, const math_word_t *b, const ntt_params_t *params);
+};
+
+/**
+ * @brief Initializes NTT parameters for a given size and modulus
  * @param params Output NTT parameters
  * @param n Transform size (must be power of 2)
  * @param modulus Prime modulus for NTT

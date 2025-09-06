@@ -19,13 +19,13 @@
 
 typedef struct
 {
-    uint32_t ring_dimension;                 // N: polynomial ring dimension (power of 2)
-    uint32_t num_moduli;                     // Number of moduli in the chain
-    bigint_t modulus_chain[CKKS_MAX_MODULI]; // RNS modulus primes (q_0, q_1, ...)
-    uint32_t modulus_bits[CKKS_MAX_MODULI];  // Bit size of each modulus
-    double scaling_factor;                   // CKKS scaling factor (Δ)
-    uint32_t max_depth;                      // Max multiplicative depth supported
-    poly_ring_params_t poly_params;          // Polynomial ring parameters (Z[X]/(X^N+1), modulus)
+  uint32_t ring_dimension;                             // N: polynomial ring dimension (power of 2)
+  uint32_t num_moduli;                                 // Number of moduli in the chain
+  bigint_t modulus_chain[CKKS_MAX_MODULI];             // RNS modulus primes (q_0, q_1, ...)
+  uint32_t modulus_bits[CKKS_MAX_MODULI];              // Bit size of each modulus
+  double scaling_factor;                               // CKKS scaling factor (Δ)
+  uint32_t max_depth;                                  // Max multiplicative depth supported
+  poly_ring_params_t poly_params_rns[CKKS_MAX_MODULI]; // Polynomial ring parameters for each modulus in the RNS chain
 } ckks_cryptoparams_t;
 
 /**

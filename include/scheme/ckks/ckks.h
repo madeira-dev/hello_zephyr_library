@@ -17,7 +17,7 @@
 // CKKS Plaintext: just a polynomial (already encoded)
 typedef struct
 {
-    polynomial_t poly;
+    rns_polynomial_t poly;
 } ckks_plaintext_t;
 
 // CKKS Ciphertext: array of polynomials (CKKS uses 2 for fresh ciphertexts)
@@ -25,7 +25,7 @@ typedef struct
 
 typedef struct
 {
-    polynomial_t parts[CKKS_MAX_CIPHERTEXT_PARTS]; // c[0], c[1]
+    rns_polynomial_t parts[CKKS_MAX_CIPHERTEXT_PARTS]; // c[0], c[1]
     uint32_t level;                                // Level in modulus chain (0 = highest)
     double scaling_factor;                         // Current scaling factor
     uint32_t depth;                                // Multiplicative depth (for future use)
@@ -34,7 +34,7 @@ typedef struct
 // CKKS Public Key: two polynomials (pk[0], pk[1])
 typedef struct
 {
-    polynomial_t pk[2];
+    rns_polynomial_t pk[2];
 } ckks_publickey_t;
 
 // (Optional) CKKS Secret Key: one polynomial (not needed for encryption-only)
