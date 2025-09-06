@@ -26,7 +26,6 @@
 // Platform Configuration (nRF52840-only)
 // ============================================================================
 
-// Platform Configuration (nRF52840-only)
 #define MATH_HAL_HAS_DSP_INSTRUCTIONS 1
 #define MATH_HAL_HAS_FPU 1
 #define MATH_HAL_HAS_HARDWARE_RNG 1
@@ -35,12 +34,12 @@
 #define MATH_HAL_CPU_FREQUENCY_MHZ 64
 
 // Maximum modulus size supported (in bits)
-#define MATH_HAL_MAX_MODULUS_BITS 64
-#define MATH_HAL_MAX_WORD_BITS 64
+#define MATH_HAL_MAX_MODULUS_BITS 32
+#define MATH_HAL_MAX_WORD_BITS 32
 
 // NTT-specific parameters
 #define MATH_HAL_MAX_NTT_SIZE 4096
-#define MATH_HAL_NTT_WORD_SIZE 64
+#define MATH_HAL_NTT_WORD_SIZE 32
 
 /**
  * @brief Basic word type for mathematical operations
@@ -194,14 +193,6 @@ math_word_t math_hal_rng_uniform(math_word_t max);
  * @return Random integer in [0, m)
  */
 math_word_t math_hal_rng_mod(math_word_t m);
-
-/**
- * @brief Use nRF52840 hardware RNG
- * @param buffer Output buffer
- * @param size Number of bytes to generate
- * @return 0 on success, negative on error
- */
-int math_hal_hw_rng_bytes(uint8_t *buffer, size_t size);
 
 // ============================================================================
 // Memory and Performance Utilities
