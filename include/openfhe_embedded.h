@@ -23,6 +23,7 @@ typedef struct
   ckks_cryptoparams_t params;
   ckks_encoder_t encoder;
   ckks_publickey_t public_key;
+  ckks_secretkey_t secret_key;
   bool is_initialized;
 } fhe_context_t;
 
@@ -48,16 +49,6 @@ int fhe_context_init(fhe_context_t *context, uint32_t ring_dimension, double sca
  * @return 0 on success, negative on error.
  */
 int fhe_encrypt(const fhe_context_t *context, const double *values, size_t value_count, ckks_ciphertext_t *ciphertext);
-
-/**
- * @brief Serializes a ciphertext to a JSON string.
- *
- * @param ciphertext The ciphertext to serialize.
- * @param buffer The buffer to write the JSON string into.
- * @param buffer_size The size of the buffer.
- * @return The number of bytes written, or a negative value on error.
- */
-int fhe_ciphertext_serialize(const ckks_ciphertext_t *ciphertext, char *buffer, size_t buffer_size);
 
 /**
  * @brief Cleans up and releases all resources used by the context.

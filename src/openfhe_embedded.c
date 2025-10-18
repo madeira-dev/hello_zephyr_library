@@ -24,7 +24,7 @@ int fhe_context_init(fhe_context_t *context, uint32_t ring_dimension, double sca
   }
 
   // 3. Generate the public key
-  if (ckks_keygen(&context->params, &context->public_key, NULL) != 0)
+  if (ckks_keygen(&context->params, &context->public_key, &context->secret_key) != 0)
   {
     return -1;
   }
@@ -52,11 +52,6 @@ int fhe_encrypt(const fhe_context_t *context, const double *values, size_t value
   }
 
   return 0;
-}
-
-int fhe_ciphertext_serialize(const ckks_ciphertext_t *ciphertext, char *buffer, size_t buffer_size)
-{
-  return ckks_ciphertext_serialize_json(ciphertext, buffer, buffer_size);
 }
 
 void fhe_context_cleanup(fhe_context_t *context)

@@ -1,94 +1,148 @@
 #include "core/utils/serialization.h"
-#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
+#include "core/math/biginteger.h"
+#include <limits.h>
 
-// Helper to serialize a single RNS polynomial
-static int rns_poly_serialize(const rns_polynomial_t *rns_poly, char *buffer, size_t buffer_size, size_t *offset)
+static int write_bytes(FILE *stream, const uint8_t *data, size_t size)
 {
-  int written = 0;
-  int ret;
+  return fwrite(data, 1, size, stream) == size ? 0 : -1;
+}
 
-  // Each RNS poly is an object with a vector "v"
-  written = snprintf(buffer + *offset, buffer_size - *offset, "{\"v\":[");
-  if (written < 0 || *offset + written >= buffer_size)
-    return -1;
-  *offset += written;
+static int write_u32(FILE *stream, uint32_t value)
+{
+  uint8_t buf[4] = {
+      (uint8_t)(value),
+      (uint8_t)(value >> 8),
+      (uint8_t)(value >> 16),
+      (uint8_t)(value >> 24)};
+  return write_bytes(stream, buf, sizeof(buf));
+}
 
-  for (uint32_t i = 0; i < rns_poly->num_moduli; i++)
+static int write_u64(FILE *stream, uint64_t value)
+{
+  uint8_t buf[8];
+  for (size_t i = 0; i < sizeof(buf); i++)
   {
-    const polynomial_t *poly = &rns_poly->polys[i];
-    // Each poly is an object with a vector "v" and format "f"
-    written = snprintf(buffer + *offset, buffer_size - *offset, "{\"v\":[");
-    if (written < 0 || *offset + written >= buffer_size)
-      return -1;
-    *offset += written;
-
-    for (uint32_t j = 0; j <= poly->degree; j++)
-    {
-      ret = snprintf(buffer + *offset, buffer_size - *offset, "%u%s",
-                     (unsigned int)poly->coeffs[j], (j == poly->degree) ? "" : ",");
-      if (ret < 0 || *offset + ret >= buffer_size)
-        return -1;
-      *offset += ret;
-    }
-
-    written = snprintf(buffer + *offset, buffer_size - *offset, "],\"f\":\"COEFFICIENT\"}%s",
-                       (i == rns_poly->num_moduli - 1) ? "" : ",");
-    if (written < 0 || *offset + written >= buffer_size)
-      return -1;
-    *offset += written;
+    buf[i] = (uint8_t)(value >> (8 * i));
   }
+  return write_bytes(stream, buf, sizeof(buf));
+}
 
-  written = snprintf(buffer + *offset, buffer_size - *offset, "]}");
-  if (written < 0 || *offset + written >= buffer_size)
+static int write_double(FILE *stream, double value)
+{
+  uint64_t raw;
+  memcpy(&raw, &value, sizeof(raw));
+  return write_u64(stream, raw);
+}
+
+static int write_math_word(FILE *stream, math_word_t value)
+{
+  uint8_t buf[sizeof(math_word_t)];
+  for (size_t i = 0; i < sizeof(math_word_t); i++)
+  {
+    buf[i] = (uint8_t)(value >> (8 * i));
+  }
+  return write_bytes(stream, buf, sizeof(buf));
+}
+
+static int write_bigint(FILE *stream, const bigint_t *value)
+{
+  if (!value)
     return -1;
-  *offset += written;
+
+  if (write_u32(stream, value->word_count) != 0)
+    return -1;
+
+  uint8_t sign = value->is_negative ? 1U : 0U;
+  if (write_bytes(stream, &sign, sizeof(sign)) != 0)
+    return -1;
+
+  for (uint32_t i = 0; i < value->word_count; i++)
+  {
+    uint8_t buf[sizeof(bigint_word_t)];
+    for (size_t j = 0; j < sizeof(bigint_word_t); j++)
+    {
+      buf[j] = (uint8_t)(value->words[i] >> (8 * j));
+    }
+    if (write_bytes(stream, buf, sizeof(buf)) != 0)
+      return -1;
+  }
 
   return 0;
 }
 
-int ckks_ciphertext_serialize_json(const ckks_ciphertext_t *ciphertext, char *buffer, size_t buffer_size)
+size_t serialization_measure_cryptocontext(const ckks_cryptoparams_t *params)
 {
-  if (!ciphertext || !buffer || buffer_size == 0)
+  if (!params || !params->modulus_bits || !params->poly_params_rns || !params->modulus_chain)
+    return 0;
+
+  size_t total = sizeof(uint8_t) * 8 + sizeof(uint32_t) * 3 + sizeof(double);
+
+  for (uint32_t i = 0; i < params->num_moduli; i++)
+  {
+    const bigint_t *chain = &params->modulus_chain[i];
+    if (!chain)
+      return 0;
+
+    total += sizeof(uint32_t);
+    total += sizeof(math_word_t);
+    total += sizeof(uint32_t);
+    total += sizeof(uint8_t);
+    total += (size_t)chain->word_count * sizeof(bigint_word_t);
+  }
+
+  return total;
+}
+
+int serialization_export_cryptocontext(FILE *stream, const ckks_cryptoparams_t *params)
+{
+  if (!stream || !params)
     return -1;
 
-  size_t offset = 0;
-  int written;
-
-  // Root object for cereal compatibility
-  written = snprintf(buffer + offset, buffer_size - offset, "{\"v\":{");
-  if (written < 0 || offset + written >= buffer_size)
-    return -1;
-  offset += written;
-
-  // Serialize c0
-  written = snprintf(buffer + offset, buffer_size - offset, "\"c0\":");
-  if (written < 0 || offset + written >= buffer_size)
-    return -1;
-  offset += written;
-
-  if (rns_poly_serialize(&ciphertext->parts[0], buffer, buffer_size, &offset) != 0)
+  size_t total_bytes = serialization_measure_cryptocontext(params);
+  if (total_bytes == 0)
     return -1;
 
-  // Separator
-  written = snprintf(buffer + offset, buffer_size - offset, ",");
-  if (written < 0 || offset + written >= buffer_size)
-    return -1;
-  offset += written;
-
-  // Serialize c1
-  written = snprintf(buffer + offset, buffer_size - offset, "\"c1\":");
-  if (written < 0 || offset + written >= buffer_size)
-    return -1;
-  offset += written;
-
-  if (rns_poly_serialize(&ciphertext->parts[1], buffer, buffer_size, &offset) != 0)
+  const uint8_t magic[] = {'O', 'F', 'H', 'E', 'C', 'T', 'X', 0x01};
+  if (write_bytes(stream, magic, sizeof(magic)) != 0)
     return -1;
 
-  // Close root object
-  written = snprintf(buffer + offset, buffer_size - offset, "}}");
-  if (written < 0 || offset + written >= buffer_size)
+  if (write_u32(stream, params->ring_dimension) != 0)
     return -1;
-  offset += written;
+  if (write_u32(stream, params->num_moduli) != 0)
+    return -1;
+  if (write_double(stream, params->scaling_factor) != 0)
+    return -1;
+  if (write_u32(stream, params->max_depth) != 0)
+    return -1;
 
-  return offset;
+  for (uint32_t i = 0; i < params->num_moduli; i++)
+  {
+    if (write_u32(stream, params->modulus_bits[i]) != 0)
+      return -1;
+    if (write_math_word(stream, params->poly_params_rns[i].coefficient_modulus) != 0)
+      return -1;
+    if (write_bigint(stream, &params->modulus_chain[i]) != 0)
+      return -1;
+  }
+
+  if (fflush(stream) != 0)
+    return -1;
+
+  return (total_bytes > INT_MAX) ? INT_MAX : (int)total_bytes;
+}
+
+int serialization_export_cryptocontext_path(const char *filepath, const ckks_cryptoparams_t *params)
+{
+  if (!filepath)
+    return -1;
+
+  FILE *fp = fopen(filepath, "wb");
+  if (!fp)
+    return -1;
+
+  int rc = serialization_export_cryptocontext(fp, params);
+  fclose(fp);
+  return rc;
 }
