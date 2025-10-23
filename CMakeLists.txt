@@ -11,8 +11,6 @@ if(CONFIG_HELLO_LIB)
         src/core/math/math_hal.c
         src/core/math/polynomial.c
         src/core/math/prime_utils.c
-        src/core/utils/serialization.c
-        src/core/utils/export.c
         src/core/scheme/ckks/ckks_cryptoparams.c
         src/core/scheme/ckks/ckks_encoder.c
         src/core/scheme/ckks/ckks_keygen.c
@@ -27,7 +25,6 @@ if(CONFIG_HELLO_LIB)
         src
         src/core
         src/core/math
-        src/core/lattice
         src/core/scheme
         src/core/scheme/ckks
         )

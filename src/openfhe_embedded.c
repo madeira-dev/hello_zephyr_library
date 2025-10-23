@@ -1,7 +1,6 @@
 #include "openfhe_embedded.h"
 #include "scheme/ckks/ckks_keygen.h"
 #include "scheme/ckks/ckks_encryptor.h"
-#include "core/utils/serialization.h"
 #include <string.h>
 
 int fhe_context_init(fhe_context_t *context, uint32_t ring_dimension, double scaling_factor)
