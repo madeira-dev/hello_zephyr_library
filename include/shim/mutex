@@ -1,0 +1,49 @@
+// openfhe_embedded/include/shim/mutex
+#ifndef ZEPHYR_SHIM_MUTEX_H
+#define ZEPHYR_SHIM_MUTEX_H
+
+// A minimal shim to make OpenFHE compile on single-threaded embedded systems
+namespace std
+{
+
+  class mutex
+  {
+  public:
+    constexpr mutex() noexcept = default;
+    ~mutex() = default;
+
+    // No-op locking for single-threaded environment
+    void lock() {}
+    bool try_lock() { return true; }
+    void unlock() {}
+  };
+
+  // A minimal unique_lock shim
+  template <typename Mutex>
+  class unique_lock
+  {
+  public:
+    explicit unique_lock(Mutex &m) : m_mutex(&m)
+    {
+      m_mutex->lock();
+    }
+
+    ~unique_lock()
+    {
+      if (m_mutex)
+        m_mutex->unlock();
+    }
+
+    // Move constructor (needed by some STL logic)
+    unique_lock(unique_lock &&other) noexcept : m_mutex(other.m_mutex)
+    {
+      other.m_mutex = nullptr;
+    }
+
+  private:
+    Mutex *m_mutex;
+  };
+
+} // namespace std
+
+#endif // ZEPHYR_SHIM_MUTEX_H
