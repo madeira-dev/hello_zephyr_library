@@ -1,81 +1,73 @@
-#include <zephyr/sys/printk.h>
 #include "api.h"
 #include <exception>
+#include <memory>
+#include <vector>
+#include <zephyr/sys/printk.h>
 
 // OpenFHE headers
-#include "math/math-hal.h"
 #include "lattice/hal/default/dcrtpoly.h"
+#include "math/math-hal.h"
 
 using namespace lbcrypto;
 
-// --- FIX 1: Restore the DCRTPoly alias ---
-// Since we are not including the high-level OpenFHE headers, we must
-// manually define what 'DCRTPoly' is.
-// In Backend 4, BigVector is defined in math-hal.h, so we just use it.
-using DCRTPoly = DCRTPolyImpl<BigVector>;
-
+// In Backend 2:
+// DCRTPoly is strictly DCRTPolyImpl<NativeVector>
+using DCRTPoly = DCRTPolyImpl<NativeVector>;
 using usint = uint32_t;
 
-void test_lib()
-{
-  // Updated print to reflect we are back to Dynamic Backend
-  printk("--- OpenFHE Lattice Smoke Test (Dynamic Backend 4) ---\n");
+void test_lib() {
+  printk("--- OpenFHE NATIVE (Backend 2) Test ---\n");
 
-  try
-  {
-    // Keep N=16 to minimize memory usage, as BE4 is heavy
-    usint ringDim = 16;
-    printk("1. Generating Parameters (N=%u)...\n", ringDim);
+  try {
+    usint ringDim = 1024;
 
+    // In Backend 2, NativeInteger is uint64_t.
+    // Ensure we are consistent.
     std::vector<NativeInteger> moduli;
     std::vector<NativeInteger> roots;
 
-    // 29-bit prime
-    moduli.push_back(NativeInteger("268435521"));
+    NativeInteger q(65537);
+    moduli.push_back(q);
 
-    for (auto &q : moduli)
-    {
-      roots.push_back(RootOfUnity(2 * ringDim, q));
+    NativeInteger root(6561);
+    roots.push_back(root);
+
+    printk("2. Creating Params...\n");
+    // FIX: Use DCRTPoly::Params instead of ILNativeParams
+    // This uses the typedef inside the DCRTPoly class, which is always correct.
+    auto params =
+        std::make_shared<DCRTPoly::Params>(2 * ringDim, moduli, roots);
+
+    printk("3. Creating Poly...\n");
+    DCRTPoly poly(params, Format::COEFFICIENT);
+    poly = 42;
+
+    // Use GetElementAtIndex(0) to get the first RNS tower (NativePoly)
+    // Then use [0] to get the first coefficient of that tower
+    auto tower = poly.GetElementAtIndex(0);
+    NativeInteger val = tower[0];
+
+    printk("   Poly element 0: %u\n", val.ConvertToInt());
+
+    printk("4. Arithmetic...\n");
+    DCRTPoly poly2 = poly;
+    DCRTPoly sum = poly + poly2;
+    auto sumTower = sum.GetElementAtIndex(0);
+    NativeInteger sumVal = sumTower[0];
+
+    printk("   Sum element 0: %u (Expected 84)\n", sumVal.ConvertToInt());
+
+    printk("5. NTT Transform...\n");
+    sum.SwitchFormat();
+
+    if (sum.GetFormat() == Format::EVALUATION) {
+      printk("   [PASS] NTT successful.\n");
+    } else {
+      printk("   [FAIL] NTT failed.\n");
     }
 
-    // --- FIX 2: Correct Template Type ---
-    // In Backend 4, the main logic uses BigInteger (Dynamic),
-    // even though the RNS towers use NativeInteger.
-    // So ILDCRTParams<BigInteger> is CORRECT.
-    auto params = std::make_shared<ILDCRTParams<BigInteger>>(
-        2 * ringDim, moduli, roots);
-
-    printk("   Parameters created.\n");
-
-    printk("2. Creating DCRTPoly...\n");
-    DCRTPoly poly1(params, Format::COEFFICIENT);
-    poly1 = 1;
-
-    DCRTPoly poly2(params, Format::COEFFICIENT);
-    poly2 = 2;
-
-    printk("3. Performing Addition...\n");
-    DCRTPoly result = poly1 + poly2;
-
-    // Verify
-    if (result.GetElementAtIndex(0).GetValues()[0].ConvertToInt() == 3)
-    {
-      printk("   [PASS] Polynomial Addition (1+2=3)\n");
-    }
-    else
-    {
-      printk("   [FAIL] Polynomial Addition\n");
-    }
+    printk("--- [SUCCESS] Backend 2 Running! ---\n");
+  } catch (const std::exception &e) {
+    printk("Error: %s\n", e.what());
   }
-  catch (const std::exception &e)
-  {
-    printk("!!! EXCEPTION CAUGHT !!!\n");
-    printk("Error message: %s\n", e.what());
-  }
-  catch (...)
-  {
-    printk("!!! UNKNOWN EXCEPTION !!!\n");
-  }
-
-  printk("--- Lattice Test Complete ---\n");
 }

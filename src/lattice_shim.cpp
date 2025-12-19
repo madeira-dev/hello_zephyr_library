@@ -4,14 +4,6 @@
 // 2. Critical: Include Parameter Definitions
 #include "lattice/hal/default/ilparams.h"
 
-// --- FIX: DEFINE ALIASES HERE (BEFORE IMPLEMENTATIONS) ---
-namespace lbcrypto
-{
-  // This alias is required by poly-impl.h
-  using ILNativeParams = ILParamsImpl<NativeInteger>;
-}
-// ---------------------------------------------------------
-
 // 3. Include Class Declarations (Headers)
 #include "lattice/hal/default/poly.h"
 #include "lattice/hal/default/dcrtpoly.h"
@@ -21,13 +13,8 @@ namespace lbcrypto
 #include "lattice/hal/default/poly-impl.h"
 #include "lattice/hal/default/dcrtpoly-impl.h"
 
-using namespace lbcrypto;
+// In Backend 2, DCRTPoly relies on NativeVector.
+// We only instantiate this one stack.
 
-// 5. Explicit Template Instantiations
-
-// A. Native Poly (Used internally by DCRTPoly)
 template class lbcrypto::PolyImpl<NativeVector>;
-
-// B. BigInteger Poly (CRT Composition) - Uses Dynamic Backend
-template class lbcrypto::PolyImpl<BigVector>;
-template class lbcrypto::DCRTPolyImpl<BigVector>;
+template class lbcrypto::DCRTPolyImpl<NativeVector>;

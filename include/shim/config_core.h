@@ -7,9 +7,8 @@
 #endif
 
 // 2. BACKEND CONFIGURATION
-// Enable Dynamic Backend (BE4)
-#undef WITH_BE2
-#define WITH_BE4 1
+#undef WITH_BE4
+#define WITH_BE2 1
 
 // 3. Disable Extras
 #undef WITH_NOISE_DEBUG
@@ -25,8 +24,12 @@
 #define HAVE_INT64 1
 #define NATIVEINT 32
 
-// 5. SELECT BACKEND 4 (Dynamic)
-#define MATHBACKEND 4
+// 5. SELECT BACKEND 2
+#define MATHBACKEND 2
+
+// CRITICAL: Define Max Modulus Size for 32-bit backend
+// This allows the library to validate parameters.
+#define MAX_MODULUS_SIZE 28
 
 // 6. Thread Local Fix
 #define thread_local static
