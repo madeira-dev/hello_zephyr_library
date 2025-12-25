@@ -6,6 +6,11 @@
 #define M_E 2.71828182845904523536
 #endif
 
+// M_PI is required for CKKS trigonometry (Chebyshev/FFT)
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 // 2. BACKEND CONFIGURATION
 #undef WITH_BE4
 #define WITH_BE2 1
@@ -30,6 +35,8 @@
 // CRITICAL: Define Max Modulus Size for 32-bit backend
 // This allows the library to validate parameters.
 #define MAX_MODULUS_SIZE 28
+
+#define COMPOSITESCALING_MAX_MODULUS_SIZE 28
 
 // 6. Thread Local Fix
 #define thread_local static

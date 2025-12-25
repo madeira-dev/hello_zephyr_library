@@ -10,6 +10,9 @@
 // 2. We alias 128-bit types to 64-bit. This allows the code to compile
 //    valid C++ syntax on the Cortex-M4, which lacks native 128-bit support.
 
+#define MAX_MODULUS_SIZE 28
+#define COMPOSITESCALING_MAX_MODULUS_SIZE 28
+
 using BasicInteger = uint32_t;
 using DoubleNativeInt = uint64_t;
 

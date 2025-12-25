@@ -1,73 +1,105 @@
+// api.cpp - MCU encryption with patched 32-bit OpenFHE
+// No longer needs pre-computed NTT tables - patches fix the 32-bit issues
+
 #include "api.h"
-#include <exception>
-#include <memory>
-#include <vector>
 #include <zephyr/sys/printk.h>
 
-// OpenFHE headers
-#include "lattice/hal/default/dcrtpoly.h"
-#include "math/math-hal.h"
+#include "keys.h" // Public key raw data
+#include "openfhe.h"
 
 using namespace lbcrypto;
 
-// In Backend 2:
-// DCRTPoly is strictly DCRTPolyImpl<NativeVector>
-using DCRTPoly = DCRTPolyImpl<NativeVector>;
-using usint = uint32_t;
-
 void test_lib() {
-  printk("--- OpenFHE NATIVE (Backend 2) Test ---\n");
+  printk("--- OpenFHE MCU Encryption (Patched 32-bit) ---\n");
 
   try {
-    usint ringDim = 1024;
+    // 1. Generate Context
+    printk("1. Generating Context...\n");
+    CCParams<CryptoContextCKKSRNS> params;
+    params.SetRingDim(2048);
+    params.SetMultiplicativeDepth(0);
+    params.SetFirstModSize(28);
+    params.SetScalingModSize(20);
+    params.SetSecurityLevel(HEStd_NotSet);
+    params.SetKeySwitchTechnique(BV);
+    params.SetScalingTechnique(FIXEDMANUAL);
 
-    // In Backend 2, NativeInteger is uint64_t.
-    // Ensure we are consistent.
-    std::vector<NativeInteger> moduli;
-    std::vector<NativeInteger> roots;
+    CryptoContext<DCRTPoly> cc = GenCryptoContext(params);
+    cc->Enable(PKE);
 
-    NativeInteger q(65537);
-    moduli.push_back(q);
+    auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersCKKSRNS>(
+        cc->GetCryptoParameters());
+    auto elementParams = cryptoParams->GetElementParams();
+    auto paramsVec = elementParams->GetParams();
 
-    NativeInteger root(6561);
-    roots.push_back(root);
+    uint32_t ringDim = elementParams->GetRingDimension();
+    uint32_t numTowers = paramsVec.size();
 
-    printk("2. Creating Params...\n");
-    // FIX: Use DCRTPoly::Params instead of ILNativeParams
-    // This uses the typedef inside the DCRTPoly class, which is always correct.
-    auto params =
-        std::make_shared<DCRTPoly::Params>(2 * ringDim, moduli, roots);
+    printk("   [OK] Context Ready. N=%u, Towers=%u\n", ringDim, numTowers);
 
-    printk("3. Creating Poly...\n");
-    DCRTPoly poly(params, Format::COEFFICIENT);
-    poly = 42;
+    // 2. Reconstruct public key from flash
+    printk("2. Reconstructing public key...\n");
+    const uint32_t *rawInts = reinterpret_cast<const uint32_t *>(
+        PublicKeyRawBuffer_raw + 8); // Skip 8-byte cereal size header
 
-    // Use GetElementAtIndex(0) to get the first RNS tower (NativePoly)
-    // Then use [0] to get the first coefficient of that tower
-    auto tower = poly.GetElementAtIndex(0);
-    NativeInteger val = tower[0];
+    std::vector<DCRTPoly> polyVec;
+    size_t globalIdx = 0;
 
-    printk("   Poly element 0: %u\n", val.ConvertToInt());
+    for (int p = 0; p < 2; p++) {
+      DCRTPoly poly(elementParams, Format::EVALUATION, true);
 
-    printk("4. Arithmetic...\n");
-    DCRTPoly poly2 = poly;
-    DCRTPoly sum = poly + poly2;
-    auto sumTower = sum.GetElementAtIndex(0);
-    NativeInteger sumVal = sumTower[0];
+      for (size_t t = 0; t < numTowers; t++) {
+        NativeVector towerValues(ringDim, paramsVec[t]->GetModulus());
+        for (size_t i = 0; i < ringDim; i++) {
+          towerValues[i] = NativeInteger(rawInts[globalIdx++]);
+        }
 
-    printk("   Sum element 0: %u (Expected 84)\n", sumVal.ConvertToInt());
-
-    printk("5. NTT Transform...\n");
-    sum.SwitchFormat();
-
-    if (sum.GetFormat() == Format::EVALUATION) {
-      printk("   [PASS] NTT successful.\n");
-    } else {
-      printk("   [FAIL] NTT failed.\n");
+        NativePoly towerPoly(paramsVec[t], Format::EVALUATION);
+        towerPoly.SetValues(std::move(towerValues), Format::EVALUATION);
+        poly.SetElementAtIndex(t, std::move(towerPoly));
+      }
+      polyVec.push_back(std::move(poly));
     }
 
-    printk("--- [SUCCESS] Backend 2 Running! ---\n");
+    PublicKey<DCRTPoly> pk = std::make_shared<PublicKeyImpl<DCRTPoly>>(cc);
+    pk->SetPublicElements(polyVec);
+    polyVec.clear();
+    polyVec.shrink_to_fit(); // Release memory immediately
+    printk("   [OK] Public Key Reconstructed.\n");
+
+    // 3. Encode and Encrypt
+    printk("3. Encrypting...\n");
+    std::vector<double> sensorData = {1.0, 2.0, 3.0};
+    Plaintext ptxt = cc->MakeCKKSPackedPlaintext(sensorData);
+    auto ciphertext = cc->Encrypt(pk, ptxt);
+    printk("   [OK] Encryption complete. Level: %u\n", ciphertext->GetLevel());
+
+    // 4. Export Ciphertext as hex
+    printk("\n=== CIPHERTEXT BEGIN ===\n");
+    const std::vector<DCRTPoly> &ctElements = ciphertext->GetElements();
+
+    printk("ELEMENTS:%u\n", (unsigned)ctElements.size());
+    printk("TOWERS:%u\n", numTowers);
+    printk("RINGDIM:%u\n", ringDim);
+    printk("LEVEL:%u\n", ciphertext->GetLevel());
+    printk("SCALINGFACTOR:%llu\n",
+           (unsigned long long)ciphertext->GetScalingFactor());
+    printk("DATA:\n");
+
+    for (const auto &poly : ctElements) {
+      const auto &towers = poly.GetAllElements();
+      for (const auto &tower : towers) {
+        const auto &vec = tower.GetValues();
+        for (size_t i = 0; i < vec.GetLength(); i++) {
+          printk("%08x", vec[i].ConvertToInt());
+          if ((i + 1) % 8 == 0)
+            printk("\n");
+        }
+      }
+    }
+    printk("\n=== CIPHERTEXT END ===\n");
+
   } catch (const std::exception &e) {
-    printk("Error: %s\n", e.what());
+    printk("EXCEPTION: %s\n", e.what());
   }
 }
