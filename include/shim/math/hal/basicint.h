@@ -21,10 +21,11 @@ using DoubleNativeInt = uint64_t;
 using uint128_t = uint64_t;
 using int128_t = int64_t;
 
-namespace lbcrypto {
-// OpenFHE classes expect these typedefs to be available in the
-// global scope for the 32-bit backend logic to work correctly
-// across all modules.
+namespace lbcrypto
+{
+  // OpenFHE classes expect these typedefs to be available in the
+  // global scope for the 32-bit backend logic to work correctly
+  // across all modules.
 }
 
 #endif // LBCRYPTO_MATH_HAL_BASICINT_H

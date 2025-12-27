@@ -40,49 +40,52 @@ CKKS implementation. See https://eprint.iacr.org/2020/1118 for details.
 
 #include "scheme/ckksrns/ckksrns-scheme.h"
 
-namespace lbcrypto {
+namespace lbcrypto
+{
 
-void SchemeCKKSRNS::Enable(PKESchemeFeature feature) {
-  switch (feature) {
-  case PKE:
-    if (m_PKE == nullptr)
-      m_PKE = std::make_shared<PKECKKSRNS>();
-    break;
-  case KEYSWITCH:
-    // m_KeySwitch must be initialized later by calling
-    // SetKeySwitchingTechnique() with the value of key switching technique from
-    // cryptoparams
-    break;
-  case PRE:
-    if (m_PRE == nullptr)
-      m_PRE = std::make_shared<PRECKKSRNS>();
-    break;
-  case LEVELEDSHE:
-    if (m_LeveledSHE == nullptr)
-      m_LeveledSHE = std::make_shared<LeveledSHECKKSRNS>();
-    break;
-  case MULTIPARTY:
-    if (m_Multiparty == nullptr)
-      m_Multiparty = std::make_shared<MultipartyCKKSRNS>();
-    break;
-  case ADVANCEDSHE:
-    if (m_AdvancedSHE == nullptr)
-      m_AdvancedSHE = std::make_shared<AdvancedSHECKKSRNS>();
-    break;
-  case FHE:
-    // if (m_FHE == nullptr)
-    //     m_FHE = std::make_shared<FHECKKSRNS>();
-    break;
-  case SCHEMESWITCH:
-    // if (m_SchemeSwitch == nullptr)
-    //     m_SchemeSwitch = std::make_shared<SWITCHCKKSRNS>();
-    break;
-  default:
-    std::stringstream ss;
-    ss << feature;
-    OPENFHE_THROW(std::string("This feature [") + ss.str() +
-                  "] is not supported for CKKSRNS scheme");
-  }
-}
+	void SchemeCKKSRNS::Enable(PKESchemeFeature feature)
+	{
+		switch (feature)
+		{
+		case PKE:
+			if (m_PKE == nullptr)
+				m_PKE = std::make_shared<PKECKKSRNS>();
+			break;
+		case KEYSWITCH:
+			// m_KeySwitch must be initialized later by calling
+			// SetKeySwitchingTechnique() with the value of key switching technique from
+			// cryptoparams
+			break;
+		case PRE:
+			if (m_PRE == nullptr)
+				m_PRE = std::make_shared<PRECKKSRNS>();
+			break;
+		case LEVELEDSHE:
+			if (m_LeveledSHE == nullptr)
+				m_LeveledSHE = std::make_shared<LeveledSHECKKSRNS>();
+			break;
+		case MULTIPARTY:
+			if (m_Multiparty == nullptr)
+				m_Multiparty = std::make_shared<MultipartyCKKSRNS>();
+			break;
+		case ADVANCEDSHE:
+			if (m_AdvancedSHE == nullptr)
+				m_AdvancedSHE = std::make_shared<AdvancedSHECKKSRNS>();
+			break;
+		case FHE:
+			// if (m_FHE == nullptr)
+			//     m_FHE = std::make_shared<FHECKKSRNS>();
+			break;
+		case SCHEMESWITCH:
+			// if (m_SchemeSwitch == nullptr)
+			//     m_SchemeSwitch = std::make_shared<SWITCHCKKSRNS>();
+			break;
+		default:
+			std::stringstream ss;
+			ss << feature;
+			OPENFHE_THROW(std::string("This feature [") + ss.str() +
+										"] is not supported for CKKSRNS scheme");
+		}
+	}
 
 } // namespace lbcrypto

@@ -2,7 +2,7 @@
 if(CONFIG_HELLO_LIB)
   zephyr_library_named(openfhe_embedded)
 
-  # 1. CRITICAL DEFINITIONS for Embedded OpenFHE
+  # 1. Critical definitions for Embedded OpenFHE
   zephyr_library_compile_definitions(
     NATIVE_SIZE=32
     WITH_BE2=1
@@ -42,7 +42,6 @@ if(CONFIG_HELLO_LIB)
 
     # --- PKE / SCHEME (CKKS) ---
     # 1. Base Crypto Context & Keys
-    # ${OPENFHE_ROOT}/src/pke/lib/cryptocontext.cpp
     ${OPENFHE_ROOT}/src/pke/lib/cryptocontextfactory.cpp
     ${OPENFHE_ROOT}/src/pke/lib/key/publickey.cpp
     ${OPENFHE_ROOT}/src/pke/lib/key/privatekey.cpp
@@ -57,8 +56,6 @@ if(CONFIG_HELLO_LIB)
     ${OPENFHE_ROOT}/src/pke/lib/scheme/ckksrns/ckksrns-parametergeneration.cpp
     ${OPENFHE_ROOT}/src/pke/lib/scheme/ckksrns/ckksrns-pke.cpp
     ${OPENFHE_ROOT}/src/pke/lib/scheme/ckksrns/ckksrns-advancedshe.cpp
-    # ${OPENFHE_ROOT}/src/pke/lib/scheme/ckksrns/ckksrns-fhe.cpp
-    # ${OPENFHE_ROOT}/src/pke/lib/scheme/ckksrns/ckksrns-scheme.cpp
     ${OPENFHE_ROOT}/src/pke/lib/schemerns/rns-pke.cpp
     ${OPENFHE_ROOT}/src/core/lib/lattice/stdlatticeparms.cpp
     ${OPENFHE_ROOT}/src/core/lib/math/dftransform.cpp
@@ -84,25 +81,15 @@ if(CONFIG_HELLO_LIB)
     ${OPENFHE_ROOT}/src/pke/lib/encoding/packedencoding.cpp
     ${OPENFHE_ROOT}/src/pke/lib/encoding/coefpackedencoding.cpp
     ${OPENFHE_ROOT}/src/pke/lib/encoding/stringencoding.cpp
-    # ${OPENFHE_ROOT}/src/pke/lib/scheme/ckksrns/ckksrns-schemeswitching.cpp
-    # ${OPENFHE_ROOT}/src/binfhe/lib/binfhecontext.cpp
-    # ${OPENFHE_ROOT}/src/binfhe/lib/binfhe-base-scheme.cpp
-    # ${OPENFHE_ROOT}/src/binfhe/lib/lwe-pke.cpp
-    # ${OPENFHE_ROOT}/src/binfhe/lib/rgsw-acc.cpp
-    # ${OPENFHE_ROOT}/src/binfhe/lib/rgsw-acc-dm.cpp
-    # ${OPENFHE_ROOT}/src/binfhe/lib/rgsw-acc-cggi.cpp
-    # ${OPENFHE_ROOT}/src/binfhe/lib/rgsw-acc-lmkcdey.cpp
-    # ${OPENFHE_ROOT}/src/binfhe/lib/rgsw-cryptoparameters.cpp
-    # ${OPENFHE_ROOT}/src/binfhe/lib/binfhe-constants-impl.cpp
     ${OPENFHE_ROOT}/src/pke/lib/globals-impl.cpp
 
 
-    # 4. Scheme Base Classes (Keep this)
+    # 4. Scheme Base Classes
     ${OPENFHE_ROOT}/src/pke/lib/scheme/scheme-id-impl.cpp
   )
 
   # === OpenFHE Include Directories ===
-  # Add OpenFHE headers (but not all sources yet)
+  # Add OpenFHE headers
   zephyr_library_include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include/shim
     ${CMAKE_CURRENT_SOURCE_DIR}/include

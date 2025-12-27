@@ -29,11 +29,9 @@
 #define HAVE_INT64 1
 #define NATIVEINT 32
 
-// 5. SELECT BACKEND 2
 #define MATHBACKEND 2
 
 // CRITICAL: Define Max Modulus Size for 32-bit backend
-// This allows the library to validate parameters.
 #define MAX_MODULUS_SIZE 28
 
 #define COMPOSITESCALING_MAX_MODULUS_SIZE 28
